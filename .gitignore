@@ -1,0 +1,62 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.venv/
+venv/
+
+# ── C++ build artifacts ──────────────────────────────────────────────────────
+*.so
+*.pyd
+*.o
+*.a
+*.dylib
+*.dll
+cpp/build/
+
+# ── Model weights ────────────────────────────────────────────────────────────
+*.pt
+*.pth
+*.onnx
+*.tflite
+
+# ── Dataset / large data ─────────────────────────────────────────────────────
+data/
+*.h5
+*.hdf5
+*.pkl
+
+# ── Experiment outputs ───────────────────────────────────────────────────────
+outputs/
+results/
+figures/
+
+# ── IDE / editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+*settings*
+
+# ── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Test / coverage ──────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ── Internal lab artifacts ───────────────────────────────────────────────────
+RUN_REGISTRY.md
+outputs/consolidated_results_*.md
+
+# ── Pre-release hygiene (smoke runs, partial bootstraps, logs, LaTeX aux) ────
+outputs/*_smoke/
+outputs/*_bootstrap50/
+outputs/*.log
+report/*
