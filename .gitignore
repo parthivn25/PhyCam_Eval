@@ -41,6 +41,7 @@ figures/
 *.swp
 .DS_Store
 *settings*
+cloud_setup.sh
 
 # ── Jupyter ──────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
