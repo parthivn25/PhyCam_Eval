@@ -6,7 +6,7 @@ Fourier transform of the squared-magnitude of the coherent PSF, which
 attenuates amplitude (unlike the phase-only A_phi operator).
 
 Physical model:
-    h_coh(x)   = F^{-1}{ exp(j alpha rho^2) }     coherent PSF
+    h_coh(x)   = F^{-1}{ exp(j alpha rho^2) }     coherent impulse response
     h_inc(x)   = |h_coh(x)|^2 / ||h_coh||_1        incoherent PSF (normalized)
     H_inc(f)   = F{ h_inc }                         incoherent OTF
     I_deg[c]   = Re{ F^{-1}{ F{I[c]} . H_inc } }   degraded image
@@ -22,6 +22,10 @@ Usage:
 Outputs:
     outputs/incoherent_defocus_sweep/
         results.json
+
+Note:
+    This diagnostic is implemented in NumPy and does not use the phycam_cpp
+    extension backend used by the retained core degradation operators.
 """
 
 import argparse
@@ -142,7 +146,8 @@ def main():
         })
 
     out = {
-        "operator":        "incoherent_defocus (OTF = F{|h|^2}, circ pupil + quadratic phase)",
+        "operator":        "incoherent_defocus (OTF = F{|h|^2}, full-grid quadratic phase)",
+        "implementation":  "numpy",
         "model":           args.model,
         "image_size":      args.image_size,
         "max_images":      args.max_images,

@@ -29,11 +29,30 @@ def _to_chw_float32(image) -> np.ndarray:
     return np.ascontiguousarray(arr, dtype=np.float32)
 
 
+def _srgb_to_linear(x: np.ndarray) -> np.ndarray:
+    """Convert gamma-encoded sRGB values in [0,1] to linear light."""
+    x = np.asarray(x, dtype=np.float32).clip(0.0, 1.0)
+    return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4).astype(
+        np.float32
+    )
+
+
+def _linear_to_srgb(x: np.ndarray) -> np.ndarray:
+    """Convert linear-light values in [0,1] to gamma-encoded sRGB."""
+    x = np.asarray(x, dtype=np.float32).clip(0.0, 1.0)
+    return np.where(
+        x <= 0.0031308,
+        12.92 * x,
+        1.055 * (x ** (1.0 / 2.4)) - 0.055,
+    ).astype(np.float32)
+
+
 class HDRCompressionOperator:
     r"""
     ODRC-inspired HDR dynamic range compression (C++ / numpy).
 
-        Q_β(I) = F⁻¹ { sign(F(I)) · |F(I)|^β }
+        L = sRGB⁻¹(I)
+        Q_β(I) = sRGB(clip(F⁻¹ { sign(F(L)) · |F(L)|^β }, 0, 1))
 
     Parameters
     ----------
@@ -58,28 +77,34 @@ class HDRCompressionOperator:
         if _CPP:
             result = self._op.apply(arr)
         else:
+            linear = _srgb_to_linear(arr)
+
             def _compress_ch(ch):
                 F = np.fft.fft2(ch)
                 mag = np.abs(F).clip(self.eps)
                 compressed = (F / mag) * mag**self.beta
                 out = np.real(np.fft.ifft2(compressed))
-                out -= out.min()
-                mx = out.max()
-                if mx > 1e-8:
-                    out /= mx
                 return out.clip(0.0, 1.0)
 
             if self.per_channel:
-                result = np.stack([_compress_ch(arr[c]) for c in range(arr.shape[0])], axis=0)
+                linear_result = np.stack(
+                    [_compress_ch(linear[c]) for c in range(linear.shape[0])],
+                    axis=0,
+                )
             else:
-                if arr.shape[0] < 3:
-                    result = np.stack([_compress_ch(arr[c]) for c in range(arr.shape[0])], axis=0)
+                if linear.shape[0] < 3:
+                    linear_result = np.stack(
+                        [_compress_ch(linear[c]) for c in range(linear.shape[0])],
+                        axis=0,
+                    )
                 else:
-                    Y = 0.299*arr[0] + 0.587*arr[1] + 0.114*arr[2]
+                    Y = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
                     Y_c = _compress_ch(Y)
                     ratio = np.where(Y > 1e-6, (Y_c / Y).clip(0, 2), 1.0)
-                    result = arr.copy()
-                    result[:3] = (arr[:3] * ratio[np.newaxis]).clip(0.0, 1.0)
+                    linear_result = linear.copy()
+                    linear_result[:3] = (linear[:3] * ratio[np.newaxis]).clip(0.0, 1.0)
+
+            result = _linear_to_srgb(linear_result)
         if was_tensor:
             return _torch.from_numpy(result).to(device=image.device)
         return result

@@ -8,6 +8,7 @@ utilities needed for the sensitivity landscape S(θ).
 from __future__ import annotations
 
 from typing import Any
+import warnings
 
 import numpy as np
 
@@ -184,6 +185,7 @@ def compute_map_ci(
 
     from tqdm import tqdm
     bootstrap_maps: list[float] = []
+    bootstrap_errors: list[str] = []
     for _ in tqdm(range(n_bootstrap), desc="  bootstrap", unit="resample",
                   dynamic_ncols=True, leave=False):
         chosen = rng.choice(image_ids, size=N, replace=True).tolist()
@@ -202,14 +204,23 @@ def compute_map_ci(
             with contextlib.redirect_stdout(io.StringIO()):
                 r = compute_map(sub_preds, sub_targets)
             bootstrap_maps.append(r["map50"])
-        except Exception:
-            pass
+        except Exception as exc:
+            bootstrap_errors.append(repr(exc))
+
+    if bootstrap_errors:
+        msg = (
+            f"{len(bootstrap_errors)} of {n_bootstrap} bootstrap mAP resamples failed; "
+            f"first failure: {bootstrap_errors[0]}"
+        )
+        if not bootstrap_maps:
+            raise RuntimeError(msg)
+        warnings.warn(msg, RuntimeWarning, stacklevel=2)
 
     ci_half = (
         1.96 * float(np.std(bootstrap_maps, ddof=1))
         if len(bootstrap_maps) >= 2 else 0.0
     )
-    return {**main, "map50_ci": ci_half}
+    return {**main, "map50_ci": ci_half, "bootstrap_failures": len(bootstrap_errors)}
 
 
 def sensitivity_ratio(

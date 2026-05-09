@@ -27,7 +27,11 @@ from pathlib import Path
 
 import numpy as np
 
-from phycam_eval.degradations import DefocusOperator, HDRCompressionOperator, SensorNoiseOperator
+from phycam_eval.degradations import (
+    DefocusOperator,
+    HDRCompressionOperator,
+    SensorNoiseOperator,
+)
 from phycam_eval.eval.coco import build_coco_targets, load_coco_images, run_detr
 from phycam_eval.eval.metrics import compute_map, compute_map_ci
 
@@ -64,10 +68,10 @@ def _run(model, processor, imgs, image_ids, conf, device):
     return [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
 
 
-def _sweep_point(run_fn, degraded, image_ids, targets, baseline):
+def _sweep_point(run_fn, degraded, image_ids, targets, baseline, bootstrap_iters, bootstrap_seed):
     t0 = time.time()
     tagged = run_fn(degraded)
-    res = compute_map_ci(tagged, targets)
+    res = compute_map_ci(tagged, targets, n_bootstrap=bootstrap_iters, seed=bootstrap_seed)
     s = res["map50"] / max(baseline, 1e-6)
     elapsed = time.time() - t0
     return res["map50"], res["map50_ci"], s, elapsed
@@ -82,6 +86,8 @@ def main():
     p.add_argument("--conf",        type=float, default=0.25)
     p.add_argument("--device",      default="cpu")
     p.add_argument("--output-dir",  default="outputs/detr_sweep")
+    p.add_argument("--bootstrap-iters", type=int, default=200)
+    p.add_argument("--bootstrap-seed", type=int, default=42)
     args = p.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -111,7 +117,8 @@ def main():
     results = {
         "model": "facebook/detr-resnet-50",
         "max_images": args.max_images,
-        "bootstrap_iters": 200,
+        "bootstrap_iters": args.bootstrap_iters,
+        "bootstrap_seed": args.bootstrap_seed,
         "score_thresh": args.conf,
         "baseline_map50": baseline_map50,
     }
@@ -122,7 +129,10 @@ def main():
     for alpha in ALPHAS:
         op = DefocusOperator(alpha=alpha)
         degraded = [op(img) for img in images]
-        map50, ci, s, elapsed = _sweep_point(run_fn, degraded, image_ids, targets, baseline_map50)
+        map50, ci, s, elapsed = _sweep_point(
+            run_fn, degraded, image_ids, targets, baseline_map50,
+            args.bootstrap_iters, args.bootstrap_seed,
+        )
         print(f"  α={alpha:.1f}  mAP={map50:.4f} ±{ci:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
         defocus_sweep.append({"param": alpha, "map50": map50, "map50_ci": ci, "S": s})
     results["defocus"] = {"baseline_map50": baseline_map50, "sweep": defocus_sweep}
@@ -133,7 +143,10 @@ def main():
     for beta in BETAS:
         op = HDRCompressionOperator(beta=beta)
         degraded = [op(img) for img in images]
-        map50, ci, s, elapsed = _sweep_point(run_fn, degraded, image_ids, targets, baseline_map50)
+        map50, ci, s, elapsed = _sweep_point(
+            run_fn, degraded, image_ids, targets, baseline_map50,
+            args.bootstrap_iters, args.bootstrap_seed,
+        )
         print(f"  β={beta:.1f}  mAP={map50:.4f} ±{ci:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
         hdr_sweep.append({"param": beta, "map50": map50, "map50_ci": ci, "S": s})
     results["hdr"] = {"baseline_map50": baseline_map50, "sweep": hdr_sweep}
@@ -154,7 +167,10 @@ def main():
             seed=42,
         )
         degraded = [op(img) for img in images]
-        map50, ci, s, elapsed = _sweep_point(run_fn, degraded, image_ids, targets, noise_baseline)
+        map50, ci, s, elapsed = _sweep_point(
+            run_fn, degraded, image_ids, targets, noise_baseline,
+            args.bootstrap_iters, args.bootstrap_seed,
+        )
         print(f"  ISO={iso}  mAP={map50:.4f} ±{ci:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
         noise_sweep.append({"param": iso, "map50": map50, "map50_ci": ci, "S": s})
     results["noise"] = {"baseline_map50": noise_baseline, "sweep": noise_sweep}

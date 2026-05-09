@@ -178,9 +178,10 @@ PYBIND11_MODULE(phycam_cpp, m) {
     // ----------------------------------------------------------------
     py::class_<HDRCompressionOperator>(m, "HDRCompressionOperator",
         R"(
-        ODRC-inspired HDR dynamic range compression.
+        ODRC-inspired HDR dynamic range compression in linear light.
 
-        Q_beta(I) = F^{-1} { sign(F(I)) * |F(I)|^beta }
+        L = sRGB^{-1}(I)
+        Q_beta(I) = sRGB(clip(F^{-1} { sign(F(L)) * |F(L)|^beta }, 0, 1))
 
         Parameters
         ----------

@@ -110,6 +110,7 @@ def main():
     p.add_argument("--test-images",     type=int, default=None,
                    help="Override test split (default: max_images - calib_images)")
     p.add_argument("--bootstrap-iters", type=int, default=100)
+    p.add_argument("--bootstrap-seed",  type=int, default=42)
     p.add_argument("--device",          default="cpu")
     p.add_argument("--conf",            type=float, default=0.25)
     p.add_argument("--output-dir",      default="outputs/hdr_tonecurve_validation_oos")
@@ -148,7 +149,11 @@ def main():
     print("\n=== Clean baseline (test split) ===")
     clean_preds = run_fn(test_imgs)
     tagged_clean = [{**p, "image_id": iid} for p, iid in zip(clean_preds, test_ids)]
-    res_clean = compute_map_ci(tagged_clean, test_targets, n_bootstrap=args.bootstrap_iters)
+    res_clean = compute_map_ci(
+        tagged_clean, test_targets,
+        n_bootstrap=args.bootstrap_iters,
+        seed=args.bootstrap_seed,
+    )
     clean_baseline = res_clean["map50"]
     clean_ci = res_clean["map50_ci"]
     print(f"  mAP@50 = {clean_baseline:.4f} ±{clean_ci:.4f}")
@@ -173,7 +178,11 @@ def main():
         test_tc = _apply_tone_curve(test_imgs, tc_fn)
         preds_test_tc = run_fn(test_tc)
         tagged_test_tc = [{**p, "image_id": iid} for p, iid in zip(preds_test_tc, test_ids)]
-        res_tc = compute_map_ci(tagged_test_tc, test_targets, n_bootstrap=args.bootstrap_iters)
+        res_tc = compute_map_ci(
+            tagged_test_tc, test_targets,
+            n_bootstrap=args.bootstrap_iters,
+            seed=args.bootstrap_seed,
+        )
         map50_tc = res_tc["map50"]
         ci_tc = res_tc["map50_ci"]
 
@@ -182,7 +191,11 @@ def main():
         test_odrc = [op(img) for img in test_imgs]
         preds_test_odrc = run_fn(test_odrc)
         tagged_test_odrc = [{**p, "image_id": iid} for p, iid in zip(preds_test_odrc, test_ids)]
-        res_odrc = compute_map_ci(tagged_test_odrc, test_targets, n_bootstrap=args.bootstrap_iters)
+        res_odrc = compute_map_ci(
+            tagged_test_odrc, test_targets,
+            n_bootstrap=args.bootstrap_iters,
+            seed=args.bootstrap_seed,
+        )
         map50_odrc = res_odrc["map50"]
 
         abs_delta = abs(map50_odrc - map50_tc)
@@ -241,6 +254,7 @@ def main():
             "calib_images":    args.calib_images,
             "test_images":     args.test_images,
             "bootstrap_iters": args.bootstrap_iters,
+            "bootstrap_seed": args.bootstrap_seed,
             "oos":             True,
         },
         "clean_baseline_test": {"map50": clean_baseline, "map50_ci": clean_ci},

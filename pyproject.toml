@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68", "wheel", "pybind11>=2.11"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -29,6 +29,7 @@ classifiers = [
 
 dependencies = [
     "torch>=2.1",
+    "torchvision>=0.16",
     "numpy>=1.24",
     "scipy>=1.11",
     "matplotlib>=3.7",
@@ -52,6 +53,7 @@ experiments = [
     "ultralytics>=8.3",
     "transformers>=4.40",
     "timm>=0.9",
+    "pybind11>=2.11",
 ]
 
 [tool.setuptools.packages.find]

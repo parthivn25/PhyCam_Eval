@@ -46,19 +46,11 @@ TEST_CASE("HDRCompressionOperator: compression_ratio_db negative for beta<1", "[
     REQUIRE(op.compression_ratio_db() < 0.0);
 }
 
-TEST_CASE("HDRCompressionOperator: beta=1 preserves structure", "[hdr]") {
+TEST_CASE("HDRCompressionOperator: beta=1 is identity", "[hdr]") {
     auto img = make_random(3, 64, 64, 13);
     HDRCompressionOperator op(1.0);
     auto out = op.apply_copy(img);
-    // Compute Pearson correlation between flattened arrays
-    double sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
-    int N = static_cast<int>(img.size());
-    for (int i = 0; i < N; ++i) {
-        double x = img.data[i], y = out.data[i];
-        sx += x; sy += y; sxx += x*x; syy += y*y; sxy += x*y;
+    for (std::size_t i = 0; i < img.data.size(); ++i) {
+        REQUIRE(std::abs(img.data[i] - out.data[i]) < 1e-4f);
     }
-    double num   = N * sxy - sx * sy;
-    double denom = std::sqrt((N * sxx - sx*sx) * (N * syy - sy*sy));
-    double corr  = (denom > 1e-10) ? num / denom : 0.0;
-    REQUIRE(corr > 0.99);
 }

@@ -8,7 +8,7 @@
 
 Existing robustness benchmarks (ImageNet-C and its derivatives) apply heuristic corruptions — Gaussian blur, uniform noise, JPEG compression — with abstract severity levels that are difficult to relate to camera or ISP parameters.
 
-PhyCam-Eval expresses each simplified degradation in camera-native units: wavefront phase strength α (quadratic pupil-phase defocus), spectral amplitude exponent β (HDR compression via the ODRC formalism), and ISO-calibrated mixed Poisson-Gaussian sensor noise. The operators are intended for reproducible sensitivity screening, not as a complete camera simulation.
+PhyCam-Eval expresses each simplified degradation in camera-native units: wavefront phase strength α (quadratic pupil-phase defocus), spectral amplitude exponent β (linear-light HDR compression via the ODRC formalism), and ISO-calibrated mixed Poisson-Gaussian sensor noise. The operators are intended for reproducible sensitivity screening, not as a complete camera simulation.
 
 ---
 
@@ -21,7 +21,7 @@ I_d = N_σ( Q_β( A_φ( I_ideal ) ) )
 | Operator | Symbol | Physical parameter | Module |
 |---|---|---|---|
 | Optical (quadratic pupil phase) | A_φ | Defocus α | `degradations/optical.py` |
-| HDR compression (ODRC) | Q_β | Compression ratio β | `degradations/hdr.py` |
+| HDR compression (linear-light ODRC) | Q_β | Compression ratio β | `degradations/hdr.py` |
 | Sensor noise | N_σ | Gain g (ISO), read noise σ_r | `degradations/noise.py` |
 
 ---
@@ -127,12 +127,19 @@ data/coco/
 └── annotations/instances_val2017.json    # COCO ground truth
 ```
 
-Download from <https://cocodataset.org/#download>. The 500-image subset is selected deterministically by sorted `image_id` (no auxiliary split file needed); the bootstrap seed is `42`.
+Download from <https://cocodataset.org/#download>. The paper runs use the first 2000 images selected deterministically by sorted `image_id` via `report/rerun_all.py`; individual sweep scripts keep smaller local defaults for quick checks. The bootstrap seed is `42`.
 
 ### C++ Build and Benchmark
 
 ```bash
 ./scripts/build.sh
 python3 -c "from phycam_eval.degradations import DefocusOperator; print(DefocusOperator(1.5))"
+python -m pytest tests/test_cpp_backend.py
+./cpp/build/phycam_tests
 ./cpp/build/phycam_benchmark
 ```
+
+Generated build directories and platform-specific extension binaries are not
+portable artifacts; rebuild them locally on each target platform.
+Some exploratory diagnostics, including `scripts/run_incoherent_defocus_sweep.py`,
+are NumPy scripts and are not part of the `phycam_cpp` extension backend.

@@ -21,7 +21,10 @@ import argparse
 import json
 from pathlib import Path
 
-from phycam_eval.degradations import HDRCompressionOperator, SensorNoiseOperator
+from phycam_eval.degradations import (
+    HDRCompressionOperator,
+    SensorNoiseOperator,
+)
 from phycam_eval.eval.coco import build_coco_targets, load_coco_images, run_yolo
 from phycam_eval.eval.metrics import compute_map_ci
 
@@ -41,10 +44,10 @@ BASE_READ_NOISE = 0.002
 BASE_GAIN = 5e-5
 
 
-def _noise_op(iso):
+def _noise_op(iso, seed=42):
     return SensorNoiseOperator.from_iso(
         iso, base_iso=BASE_ISO, base_read_noise=BASE_READ_NOISE,
-        base_gain=BASE_GAIN, seed=42,
+        base_gain=BASE_GAIN, seed=seed,
     )
 
 
@@ -83,6 +86,7 @@ def _run_chained_cells(
     model,
     device,
     bootstrap_iters,
+    bootstrap_seed,
     clean_map,
     s_beta,
     s_iso,
@@ -98,14 +102,18 @@ def _run_chained_cells(
     results = []
     for k, (beta, iso) in enumerate(cells):
         _progress(k, len(cells), f"beta={beta} ISO={iso}")
-        noise_op = _noise_op(iso)
+        noise_op = _noise_op(iso, seed=args.noise_seed)
         hdr_op = HDRCompressionOperator(beta=beta)
         if order == "original":
             deg_images = [noise_op(hdr_op(img)) for img in images]
         else:
             deg_images = [hdr_op(noise_op(img)) for img in images]
         preds = run_yolo(model, deg_images, device=device)
-        r = compute_map_ci(_tag(preds, image_ids), targets, n_bootstrap=bootstrap_iters)
+        r = compute_map_ci(
+            _tag(preds, image_ids), targets,
+            n_bootstrap=bootstrap_iters,
+            seed=bootstrap_seed,
+        )
         m, ci = r["map50"], r["map50_ci"]
         s_meas = m / clean_map
         s_pred = s_beta[beta] * s_iso[iso]
@@ -144,7 +152,8 @@ def run_sweep(args):
     print("\nRunning clean baseline...")
     clean_preds = run_yolo(model, images, device=args.device)
     res = compute_map_ci(_tag(clean_preds, image_ids), targets,
-                         n_bootstrap=args.bootstrap_iters)
+                         n_bootstrap=args.bootstrap_iters,
+                         seed=args.bootstrap_seed)
     clean_map, clean_ci = res["map50"], res["map50_ci"]
     print(f"  Clean: mAP@50 = {clean_map:.4f} ± {clean_ci:.4f}")
 
@@ -159,7 +168,11 @@ def run_sweep(args):
         op = HDRCompressionOperator(beta=beta)
         deg_images = [op(img) for img in images]
         preds = run_yolo(model, deg_images, device=args.device)
-        r = compute_map_ci(_tag(preds, image_ids), targets, n_bootstrap=50)
+        r = compute_map_ci(
+            _tag(preds, image_ids), targets,
+            n_bootstrap=args.marginal_bootstrap_iters,
+            seed=args.bootstrap_seed,
+        )
         s_beta[beta] = r["map50"] / clean_map
     _progress(len(BETAS), len(BETAS), "done")
 
@@ -167,10 +180,14 @@ def run_sweep(args):
     s_iso = {}
     for i, iso in enumerate(ISOS):
         _progress(i, len(ISOS), f"ISO={iso}")
-        op = _noise_op(iso)
+        op = _noise_op(iso, seed=args.noise_seed)
         deg_images = [op(img) for img in images]
         preds = run_yolo(model, deg_images, device=args.device)
-        r = compute_map_ci(_tag(preds, image_ids), targets, n_bootstrap=50)
+        r = compute_map_ci(
+            _tag(preds, image_ids), targets,
+            n_bootstrap=args.marginal_bootstrap_iters,
+            seed=args.bootstrap_seed,
+        )
         s_iso[iso] = r["map50"] / clean_map
     _progress(len(ISOS), len(ISOS), "done")
 
@@ -188,6 +205,7 @@ def run_sweep(args):
             model=model,
             device=args.device,
             bootstrap_iters=args.bootstrap_iters,
+            bootstrap_seed=args.bootstrap_seed,
             clean_map=clean_map,
             s_beta=s_beta,
             s_iso=s_iso,
@@ -202,6 +220,7 @@ def run_sweep(args):
         model=model,
         device=args.device,
         bootstrap_iters=args.bootstrap_iters,
+        bootstrap_seed=args.bootstrap_seed,
         clean_map=clean_map,
         s_beta=s_beta,
         s_iso=s_iso,
@@ -231,6 +250,9 @@ def run_sweep(args):
             "coco_root": args.coco_root,
             "max_images": args.max_images,
             "bootstrap_iters": args.bootstrap_iters,
+            "bootstrap_seed": args.bootstrap_seed,
+            "marginal_bootstrap_iters": args.marginal_bootstrap_iters,
+            "noise_seed": args.noise_seed,
             "full_grid": args.full_grid,
             "compare_original_order": args.compare_original_order,
         },
@@ -290,7 +312,10 @@ def main():
     parser.add_argument("--coco-root", default="data/coco")
     parser.add_argument("--max-images", type=int, default=500)
     parser.add_argument("--bootstrap-iters", type=int, default=200)
-    parser.add_argument("--device", default="mps")
+    parser.add_argument("--bootstrap-seed", type=int, default=42)
+    parser.add_argument("--marginal-bootstrap-iters", type=int, default=50)
+    parser.add_argument("--noise-seed", type=int, default=42)
+    parser.add_argument("--device", default="cpu")
     parser.add_argument("--output-dir", default="outputs/swap_order_experiment")
     parser.add_argument(
         "--full-grid",

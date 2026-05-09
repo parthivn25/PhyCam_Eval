@@ -83,6 +83,7 @@ def main():
     p.add_argument("--sigmas",      default="0,0.5,1.0,1.5,2.0,2.5,3.0",
                    help="Comma-separated Gaussian σ values (pixels, post-resize)")
     p.add_argument("--bootstrap-iters", type=int, default=200)
+    p.add_argument("--bootstrap-seed", type=int, default=42)
     args = p.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -109,6 +110,7 @@ def main():
         [{**pr, "image_id": iid} for pr, iid in zip(clean_preds, image_ids)],
         targets,
         n_bootstrap=args.bootstrap_iters,
+        seed=args.bootstrap_seed,
     )
     baseline_map50 = map_res["map50"]
     baseline_map50_ci = map_res["map50_ci"]
@@ -138,7 +140,11 @@ def main():
 
         preds = run_fn(degraded)
         tagged = [{**pr, "image_id": iid} for pr, iid in zip(preds, image_ids)]
-        res = compute_map_ci(tagged, targets, n_bootstrap=args.bootstrap_iters)
+        res = compute_map_ci(
+            tagged, targets,
+            n_bootstrap=args.bootstrap_iters,
+            seed=args.bootstrap_seed,
+        )
         map50_val = res["map50"]
         map50_ci  = res["map50_ci"]
         s_val = map50_val / max(baseline_map50, 1e-6)

@@ -24,7 +24,10 @@ import json
 import numpy as np
 from pathlib import Path
 
-from phycam_eval.degradations import HDRCompressionOperator, SensorNoiseOperator
+from phycam_eval.degradations import (
+    HDRCompressionOperator,
+    SensorNoiseOperator,
+)
 from phycam_eval.eval.coco import build_coco_targets, load_coco_images, run_yolo
 from phycam_eval.eval.metrics import compute_map
 
@@ -65,6 +68,8 @@ def main():
     p.add_argument("--model",           default="yolov8n.pt")
     p.add_argument("--max-images",      type=int, default=200)
     p.add_argument("--bootstrap-iters", type=int, default=500)
+    p.add_argument("--bootstrap-seed",  type=int, default=RNG_SEED)
+    p.add_argument("--noise-seed",      type=int, default=RNG_SEED)
     p.add_argument("--image-size",      type=int, default=640)
     p.add_argument("--device",          default="cpu")
     p.add_argument("--output-dir",      default="outputs/gamma_bootstrap")
@@ -72,7 +77,7 @@ def main():
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    rng = np.random.default_rng(RNG_SEED)
+    rng = np.random.default_rng(args.bootstrap_seed)
 
     print(f"Loading {args.max_images} COCO images ...")
     image_ids, images, metas, coco_data = load_coco_images(
@@ -85,7 +90,7 @@ def main():
     run_fn = lambda imgs: run_yolo(model, imgs, device=args.device)
 
     # Build all degraded image sets we need
-    noise_hi = make_noise(ISO_NOISY)
+    noise_hi = make_noise(ISO_NOISY, seed=args.noise_seed)
     conditions = {"clean": images}
     for beta in KEY_BETAS:
         hdr_op = HDRCompressionOperator(beta=beta)
@@ -155,6 +160,8 @@ def main():
         json.dump({
             "max_images": args.max_images,
             "bootstrap_iters": args.bootstrap_iters,
+            "bootstrap_seed": args.bootstrap_seed,
+            "noise_seed": args.noise_seed,
             "baseline_map50": baseline,
             "cells": results,
         }, f, indent=2)

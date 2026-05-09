@@ -37,18 +37,20 @@ fi
 
 cmake "$CPP_DIR" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TESTS=OFF \
+    -DBUILD_TESTS=ON \
     -DBUILD_BENCHMARK=ON \
     -DPython_EXECUTABLE="$PYTHON_BIN"
 
-make -j"$JOBS" phycam_cpp phycam_benchmark
+make -j"$JOBS" phycam_cpp phycam_tests phycam_benchmark
 
 echo ""
 echo "=== Build complete ==="
 echo "Extension   : $PROJECT_ROOT/phycam_eval/degradations/phycam_cpp*.so"
+echo "Tests       : $BUILD_DIR/phycam_tests"
 echo "Benchmark   : $BUILD_DIR/phycam_benchmark"
 echo "Python      : $PYTHON_BIN"
 echo ""
 echo "To verify:"
 echo "  $PYTHON_BIN -c \"from phycam_eval.degradations import DefocusOperator; print(DefocusOperator(1.5))\""
+echo "  ./cpp/build/phycam_tests"
 echo "  ./cpp/build/phycam_benchmark"

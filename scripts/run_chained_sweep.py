@@ -32,7 +32,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from phycam_eval.degradations import HDRCompressionOperator, SensorNoiseOperator
+from phycam_eval.degradations import (
+    HDRCompressionOperator,
+    SensorNoiseOperator,
+)
 from phycam_eval.eval.coco import build_coco_targets, load_coco_images, run_yolo, run_fasterrcnn
 from phycam_eval.eval.metrics import compute_map_ci
 from phycam_eval.eval.plotting import PAPER_COLORS, paper_style, save_figure, style_axes
@@ -67,13 +70,27 @@ BASE_READ_NOISE = 0.002
 BASE_GAIN = 5e-5
 
 
-def run_grid(images, image_ids, targets, run_fn, betas, iso_values):
+def run_grid(
+    images,
+    image_ids,
+    targets,
+    run_fn,
+    betas,
+    iso_values,
+    bootstrap_iters: int = 200,
+    bootstrap_seed: int = 42,
+    noise_seed: int = 42,
+):
     """Run every (β, ISO) combination. Returns baseline_map50, grid of (map50, map50_ci)."""
     # Baseline (β=1, ISO=100 clean)
     print("\n=== Baseline (clean) ===")
     clean_preds = run_fn(images)
     tagged_clean = [{**p, "image_id": iid} for p, iid in zip(clean_preds, image_ids)]
-    map_res = compute_map_ci(tagged_clean, targets)
+    map_res = compute_map_ci(
+        tagged_clean, targets,
+        n_bootstrap=bootstrap_iters,
+        seed=bootstrap_seed,
+    )
     baseline_map50 = map_res["map50"]
     print(f"  mAP@50 = {baseline_map50:.4f} ±{map_res['map50_ci']:.4f}")
 
@@ -90,12 +107,16 @@ def run_grid(images, image_ids, targets, run_fn, betas, iso_values):
                 base_iso=BASE_ISO,
                 base_read_noise=BASE_READ_NOISE,
                 base_gain=BASE_GAIN,
-                seed=42,
+                seed=noise_seed,
             )
             chained = [noise_op(img) for img in hdr_degraded]
             preds = run_fn(chained)
             tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
-            map_res = compute_map_ci(tagged, targets)
+            map_res = compute_map_ci(
+                tagged, targets,
+                n_bootstrap=bootstrap_iters,
+                seed=bootstrap_seed,
+            )
             m, ci = map_res["map50"], map_res["map50_ci"]
             grid[(beta, iso)] = {"map50": m, "map50_ci": ci}
             print(f"  ISO={iso:5d}  mAP@50={m:.4f} ±{ci:.4f}  S={m/max(baseline_map50,1e-6):.3f}")
@@ -260,6 +281,12 @@ def main():
                    default=",".join(str(v) for v in DEFAULT_BETAS))
     p.add_argument("--iso-values",
                    default=",".join(str(v) for v in DEFAULT_ISOS))
+    p.add_argument("--bootstrap-iters", type=int, default=200,
+                   help="Bootstrap resamples for mAP CI")
+    p.add_argument("--bootstrap-seed", type=int, default=42,
+                   help="Bootstrap RNG seed")
+    p.add_argument("--noise-seed", type=int, default=42,
+                   help="Sensor-noise realization seed")
     args = p.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -278,13 +305,20 @@ def main():
     _, run_fn, det_tag = _load_detector(args)
 
     baseline_map50, grid = run_grid(
-        images, image_ids, targets, run_fn, betas, iso_values
+        images, image_ids, targets, run_fn, betas, iso_values,
+        bootstrap_iters=args.bootstrap_iters,
+        bootstrap_seed=args.bootstrap_seed,
+        noise_seed=args.noise_seed,
     )
 
     # Save JSON (detector-tagged filename for non-default runs)
     suffix = f"_{det_tag}" if det_tag != "yolo" else ""
     results = {
         "detector": det_tag,
+        "max_images": args.max_images,
+        "bootstrap_iters": args.bootstrap_iters,
+        "bootstrap_seed": args.bootstrap_seed,
+        "noise_seed": args.noise_seed,
         "baseline_map50": baseline_map50,
         "betas": betas,
         "iso_values": iso_values,

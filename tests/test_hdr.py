@@ -28,17 +28,13 @@ class TestHDRCompressionOperator:
 
     def test_identity_at_beta_one(self, image):
         """
-        beta=1.0: |F(I)|^1 = |F(I)|  → Q_1(I) = F⁻¹{F(I)} = I (up to normalisation).
-        The output is normalised to [0,1], so we check that the structure is preserved
-        rather than exact equality.
+        beta=1.0: |F(I)|^1 = |F(I)| → Q_1(I) = F⁻¹{F(I)} = I.
         """
         op = HDRCompressionOperator(beta=1.0)
         out = op(image)
-        # Pearson correlation between flattened tensors should be near 1
-        x = image.flatten()
-        y = out.flatten()
-        corr = torch.corrcoef(torch.stack([x, y]))[0, 1].item()
-        assert corr > 0.99, f"beta=1 correlation = {corr:.4f}, expected > 0.99"
+        assert torch.allclose(out, image, atol=1e-5), (
+            f"Max diff at beta=1: {(out - image).abs().max():.2e}"
+        )
 
     def test_invalid_beta(self):
         with pytest.raises(ValueError):

@@ -80,6 +80,12 @@ def main():
     p.add_argument("--iso-values",
                    default=",".join(str(v) for v in DEFAULT_ISO_VALUES),
                    help="Comma-separated ISO values to sweep")
+    p.add_argument("--bootstrap-iters", type=int, default=200,
+                   help="Bootstrap resamples for mAP CI")
+    p.add_argument("--bootstrap-seed", type=int, default=42,
+                   help="Bootstrap RNG seed")
+    p.add_argument("--noise-seed", type=int, default=42,
+                   help="Sensor-noise realization seed")
     args = p.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -138,7 +144,7 @@ def main():
             base_iso=args.base_iso,
             base_read_noise=args.base_read_noise,
             base_gain=args.base_gain,
-            seed=42,
+            seed=args.noise_seed,
         )
         print(f"\n=== ISO = {iso} (gain = {op.gain:.2e}) ===")
         snr = op.snr_db(signal=0.5)
@@ -155,7 +161,11 @@ def main():
         if run_fn is not None:
             preds = run_fn(degraded)
             tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
-            map_res = compute_map_ci(tagged, targets)
+            map_res = compute_map_ci(
+                tagged, targets,
+                n_bootstrap=args.bootstrap_iters,
+                seed=args.bootstrap_seed,
+            )
             map50_val = map_res["map50"]
             map50_ci = map_res["map50_ci"]
             print(f"  mAP@50 = {map50_val:.4f} ±{map50_ci:.4f}  "
@@ -193,6 +203,11 @@ def main():
     with open(results_path, "w") as f:
         json.dump({
             "detector": det_tag,
+            "max_images": args.max_images,
+            "image_offset": args.image_offset,
+            "bootstrap_iters": args.bootstrap_iters,
+            "bootstrap_seed": args.bootstrap_seed,
+            "noise_seed": args.noise_seed,
             "base_iso": args.base_iso,
             "base_read_noise": args.base_read_noise,
             "base_gain": args.base_gain,

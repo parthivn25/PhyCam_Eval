@@ -5,7 +5,8 @@ Runs YOLO over degraded COCO images across a range of HDR compression
 exponents (beta) and generates a sensitivity landscape (mAP + MTF50 vs beta).
 
 Physical model (ODRC spectral amplitude compression):
-    Q_β(I) = F⁻¹ { sign(F(I)) · |F(I)|^β }
+    L = sRGB⁻¹(I)
+    Q_β(I) = sRGB(clip(F⁻¹ { sign(F(L)) · |F(L)|^β }, 0, 1))
     β = 1.0 → identity (no compression)
     β < 1.0 → dynamic range compression (highlight rolloff)
     β > 1.0 → dynamic range expansion (contrast boost)
@@ -74,6 +75,10 @@ def main():
     p.add_argument("--betas",
                    default=",".join(str(v) for v in DEFAULT_BETA_VALUES),
                    help="Comma-separated beta values to sweep (1.0=identity)")
+    p.add_argument("--bootstrap-iters", type=int, default=200,
+                   help="Bootstrap resamples for mAP CI")
+    p.add_argument("--bootstrap-seed", type=int, default=42,
+                   help="Bootstrap RNG seed")
     args = p.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -142,7 +147,11 @@ def main():
         if run_fn is not None:
             preds = run_fn(degraded)
             tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
-            map_res = compute_map_ci(tagged, targets)
+            map_res = compute_map_ci(
+                tagged, targets,
+                n_bootstrap=args.bootstrap_iters,
+                seed=args.bootstrap_seed,
+            )
             map50_val = map_res["map50"]
             map50_ci = map_res["map50_ci"]
             print(f"  mAP@50 = {map50_val:.4f} ±{map50_ci:.4f}  "
@@ -177,6 +186,10 @@ def main():
     with open(results_path, "w") as f:
         json.dump({
             "detector": det_tag,
+            "max_images": args.max_images,
+            "image_offset": args.image_offset,
+            "bootstrap_iters": args.bootstrap_iters,
+            "bootstrap_seed": args.bootstrap_seed,
             "baseline_map50": baseline_map50,
             "baseline_mtf50": baseline_mtf50,
             "sweep": all_data,
