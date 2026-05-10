@@ -133,6 +133,20 @@ TEST_CASE("LowLightOperator: output shape and range", "[optical][lowlight]") {
     }
 }
 
+TEST_CASE("LowLightOperator: repeated calls use independent noise realizations", "[optical][lowlight]") {
+    ImageBuffer img(3, 32, 32);
+    std::fill(img.data.begin(), img.data.end(), 0.5f);
+    LowLightOperator op(0.3, 2, 123);
+
+    auto first = op.apply_copy(img);
+    auto second = op.apply_copy(img);
+
+    double max_diff = 0.0;
+    for (std::size_t i = 0; i < first.size(); ++i)
+        max_diff = std::max(max_diff, std::abs((double)(first.data[i] - second.data[i])));
+    REQUIRE(max_diff > 1e-6);
+}
+
 TEST_CASE("LowLightOperator: invalid light_level throws", "[optical][lowlight]") {
     REQUIRE_THROWS_AS(LowLightOperator(0.0),  std::invalid_argument);
     REQUIRE_THROWS_AS(LowLightOperator(1.5),  std::invalid_argument);

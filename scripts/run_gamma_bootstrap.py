@@ -53,8 +53,10 @@ def bootstrap_map(preds, targets, image_ids, n_iters, rng):
     maps = []
     for _ in range(n_iters):
         idx = rng.integers(0, n, size=n)
-        sel_preds   = [{**preds[i], "image_id": image_ids[i]} for i in idx]
-        sel_targets = [targets[i] for i in idx]
+        sel_preds, sel_targets = [], []
+        for new_id, i in enumerate(idx):
+            sel_preds.append({**preds[i], "image_id": new_id})
+            sel_targets.append({**targets[i], "image_id": new_id})
         try:
             maps.append(compute_map(sel_preds, sel_targets)["map50"])
         except Exception:
@@ -90,12 +92,13 @@ def main():
     run_fn = lambda imgs: run_yolo(model, imgs, device=args.device)
 
     # Build all degraded image sets we need
-    noise_hi = make_noise(ISO_NOISY, seed=args.noise_seed)
     conditions = {"clean": images}
     for beta in KEY_BETAS:
         hdr_op = HDRCompressionOperator(beta=beta)
         conditions[f"hdr_{beta}"]     = [hdr_op(img) for img in images]
+        noise_hi = make_noise(ISO_NOISY, seed=args.noise_seed)
         conditions[f"chained_{beta}"] = [noise_hi(hdr_op(img)) for img in images]
+    noise_hi = make_noise(ISO_NOISY, seed=args.noise_seed)
     conditions["noise_only"] = [noise_hi(img) for img in images]
 
     # Run YOLO once per condition — store raw predictions
@@ -105,10 +108,11 @@ def main():
         print(f"  {name} ...")
         preds[name] = run_fn(imgs)
 
-    # Point-estimate baseline
-    base_maps = bootstrap_map(preds["clean"], targets, image_ids, 1,
-                              np.random.default_rng(0))
-    baseline = float(base_maps[0]) if len(base_maps) else 0.0
+    # Point-estimate baseline on the actual evaluation set, not a bootstrap draw.
+    baseline = compute_map(
+        [{**p, "image_id": iid} for p, iid in zip(preds["clean"], image_ids)],
+        targets,
+    )["map50"]
     print(f"\nBaseline mAP: {baseline:.4f}")
 
     results = []
@@ -122,8 +126,10 @@ def main():
             idx = rng.integers(0, n, size=n)
 
             def _map(name):
-                sel_p = [{**preds[name][i], "image_id": image_ids[i]} for i in idx]
-                sel_t = [targets[i] for i in idx]
+                sel_p, sel_t = [], []
+                for new_id, i in enumerate(idx):
+                    sel_p.append({**preds[name][i], "image_id": new_id})
+                    sel_t.append({**targets[i], "image_id": new_id})
                 try:
                     return compute_map(sel_p, sel_t)["map50"]
                 except Exception:

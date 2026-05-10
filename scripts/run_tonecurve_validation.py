@@ -6,7 +6,7 @@ out-of-sample on a held-out image split.  Validates that beta_eff tracks
 tone-curve mAP ordering (not that it matches numerical values exactly).
 
 Protocol:
-  - Calib: first --calib-images from the 500-image subset
+  - Calib: first --calib-images from the sorted image subset
   - Test:  next --test-images (OOS) from the same sorted ID sequence
   - For each tone curve: fit beta_eff by minimizing |mAP_Q(calib) - mAP_tc(calib)|
   - Report: Pearson r between mAP_Q(beta_eff) and mAP_tc on test split, n within CI

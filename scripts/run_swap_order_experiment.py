@@ -87,6 +87,7 @@ def _run_chained_cells(
     device,
     bootstrap_iters,
     bootstrap_seed,
+    noise_seed,
     clean_map,
     s_beta,
     s_iso,
@@ -102,7 +103,7 @@ def _run_chained_cells(
     results = []
     for k, (beta, iso) in enumerate(cells):
         _progress(k, len(cells), f"beta={beta} ISO={iso}")
-        noise_op = _noise_op(iso, seed=args.noise_seed)
+        noise_op = _noise_op(iso, seed=noise_seed)
         hdr_op = HDRCompressionOperator(beta=beta)
         if order == "original":
             deg_images = [noise_op(hdr_op(img)) for img in images]
@@ -147,7 +148,7 @@ def run_sweep(args):
 
     print("Loading YOLOv8n model...")
     from ultralytics import YOLO
-    model = YOLO("yolov8n.pt")
+    model = YOLO(args.model)
 
     print("\nRunning clean baseline...")
     clean_preds = run_yolo(model, images, device=args.device)
@@ -206,6 +207,7 @@ def run_sweep(args):
             device=args.device,
             bootstrap_iters=args.bootstrap_iters,
             bootstrap_seed=args.bootstrap_seed,
+            noise_seed=args.noise_seed,
             clean_map=clean_map,
             s_beta=s_beta,
             s_iso=s_iso,
@@ -221,6 +223,7 @@ def run_sweep(args):
         device=args.device,
         bootstrap_iters=args.bootstrap_iters,
         bootstrap_seed=args.bootstrap_seed,
+        noise_seed=args.noise_seed,
         clean_map=clean_map,
         s_beta=s_beta,
         s_iso=s_iso,
@@ -310,6 +313,7 @@ def run_sweep(args):
 def main():
     parser = argparse.ArgumentParser(description="Pipeline ordering sensitivity experiment")
     parser.add_argument("--coco-root", default="data/coco")
+    parser.add_argument("--model", default="yolov8n.pt")
     parser.add_argument("--max-images", type=int, default=500)
     parser.add_argument("--bootstrap-iters", type=int, default=200)
     parser.add_argument("--bootstrap-seed", type=int, default=42)

@@ -258,8 +258,20 @@ class LowLightOperator:
         self.light_level = light_level
         self.order = order
         self.seed = seed
+        self._call_index = 0
         if _CPP:
             self._op = _cpp.LowLightOperator(light_level, order, seed)
+
+    def _next_seed(self) -> int:
+        seed = (int(self.seed) + self._call_index * 1000003) & 0xFFFFFFFF
+        self._call_index += 1
+        return seed
+
+    def reset_rng(self) -> None:
+        """Reset the per-call RNG stream to the constructor seed."""
+        self._call_index = 0
+        if _CPP:
+            self._op = _cpp.LowLightOperator(self.light_level, self.order, self.seed)
 
     def __call__(self, image) -> np.ndarray:
         was_tensor = _TORCH and isinstance(image, _torch.Tensor)
@@ -274,7 +286,7 @@ class LowLightOperator:
             amp = 1.0 / (1.0 + (rho / rho_c) ** (2 * self.order))
             degraded = _apply_amp_np(arr, amp)
             noise_std = 0.05 / math.sqrt(self.light_level)
-            rng = np.random.default_rng(self.seed)
+            rng = np.random.default_rng(self._next_seed())
             noise = rng.normal(0.0, noise_std, degraded.shape).astype(np.float32)
             result = (degraded + noise).clip(0.0, 1.0)
         if was_tensor:

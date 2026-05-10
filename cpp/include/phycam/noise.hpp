@@ -21,12 +21,13 @@ public:
     double read_noise_std; // read noise std in normalised [0,1] units
     bool   clip;           // clamp output to [0,1]
     unsigned int seed;
+    mutable unsigned long long call_index;
 
     explicit SensorNoiseOperator(double gain = 1.0,
                                   double read_noise_std = 0.005,
                                   bool clip = true,
                                   unsigned int seed = 12345)
-        : gain(gain), read_noise_std(read_noise_std), clip(clip), seed(seed)
+        : gain(gain), read_noise_std(read_noise_std), clip(clip), seed(seed), call_index(0)
     {
         if (gain <= 0.0)
             throw std::invalid_argument("SensorNoiseOperator: gain must be > 0");
@@ -48,8 +49,9 @@ public:
 
         static constexpr double kPi = 3.14159265358979323846;
 
-        // LCG state — one per call so results are reproducible
-        unsigned int s = seed;
+        // LCG state — deterministic per call, independent across repeated
+        // applications of the same operator instance.
+        unsigned int s = seed + static_cast<unsigned int>(call_index++ * 1000003ull);
         auto lcg = [&s]() -> double {
             s = s * 1664525u + 1013904223u;
             return (s / 4294967296.0);  // [0, 1)

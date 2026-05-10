@@ -18,6 +18,7 @@ import torch
 
 from phycam_eval.degradations.optical import (
     DefocusOperator,
+    LowLightOperator,
     _frequency_grid,
     _radial_freq,
 )
@@ -147,3 +148,26 @@ class TestFrequencyHelpers:
         fy, fx = _frequency_grid(H, W, torch.device("cpu"))
         rho = _radial_freq(fy, fx)
         assert rho[0, 0].item() == pytest.approx(0.0, abs=1e-6)
+
+
+class TestLowLightOperator:
+
+    def test_repeated_calls_use_independent_noise_realizations(self):
+        img = torch.full((3, 32, 32), 0.5, dtype=torch.float32)
+        op = LowLightOperator(light_level=0.3, order=2, seed=123)
+
+        first = op(img)
+        second = op(img)
+
+        assert not torch.allclose(first, second)
+
+    def test_reset_rng_reproduces_first_noise_realization(self):
+        img = torch.full((3, 32, 32), 0.5, dtype=torch.float32)
+        op = LowLightOperator(light_level=0.3, order=2, seed=123)
+
+        first = op(img)
+        _ = op(img)
+        op.reset_rng()
+        replay = op(img)
+
+        assert torch.allclose(first, replay)

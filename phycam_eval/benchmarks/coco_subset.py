@@ -120,12 +120,19 @@ class COCOSubset(Dataset):
 
         # Build target dict compatible with pycocotools / torchvision
         anns = self._annotations[image_id]
+        scale_x = image_tensor.shape[2] / meta["width"]
+        scale_y = image_tensor.shape[1] / meta["height"]
         boxes, labels, areas, iscrowds = [], [], [], []
         for ann in anns:
             x, y, w, h = ann["bbox"]
-            boxes.append([x, y, x + w, y + h])
+            boxes.append([
+                x * scale_x,
+                y * scale_y,
+                (x + w) * scale_x,
+                (y + h) * scale_y,
+            ])
             labels.append(ann["category_id"])
-            areas.append(ann["area"])
+            areas.append(ann.get("area", w * h) * scale_x * scale_y)
             iscrowds.append(ann.get("iscrowd", 0))
 
         target = {

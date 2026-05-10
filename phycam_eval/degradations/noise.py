@@ -55,17 +55,36 @@ class SensorNoiseOperator:
         self.read_noise_std = read_noise_std
         self.clip = clip
         self.seed = seed
+        self._call_index = 0
         if _CPP:
             self._op = _cpp.SensorNoiseOperator(gain, read_noise_std, clip, seed)
+
+    def _next_seed(self) -> int:
+        """Return a deterministic per-call seed for independent realizations."""
+        seed = (int(self.seed) + self._call_index * 1000003) & 0xFFFFFFFF
+        self._call_index += 1
+        return seed
+
+    def reset_rng(self) -> None:
+        """Reset the deterministic realization sequence to the constructor seed."""
+        self._call_index = 0
+        if _CPP:
+            self._op = _cpp.SensorNoiseOperator(
+                self.gain, self.read_noise_std, self.clip, int(self.seed)
+            )
 
     def __call__(self, image) -> np.ndarray:
         was_tensor = _TORCH and isinstance(image, _torch.Tensor)
         arr = _to_chw_float32(image)
+        call_seed = self._next_seed()
         if _CPP:
-            result = self._op.apply(arr)
+            op = _cpp.SensorNoiseOperator(
+                self.gain, self.read_noise_std, self.clip, call_seed
+            )
+            result = op.apply(arr)
         else:
             sigma_shot = np.sqrt(self.gain * arr.clip(min=0.0)).astype(np.float32)
-            rng = np.random.default_rng(self.seed)
+            rng = np.random.default_rng(call_seed)
             shot  = (rng.standard_normal(arr.shape) * sigma_shot).astype(np.float32)
             read  = rng.normal(0.0, self.read_noise_std, arr.shape).astype(np.float32)
             noisy = arr + shot + read
@@ -89,7 +108,7 @@ class SensorNoiseOperator:
 
         base_gain calibrates the shot-noise scale so that ISO 100 at mid-gray
         (signal=0.5) gives SNR ≈ 40 dB, matching a well-exposed camera sensor.
-        ISO doubles per stop: ISO 1600 → SNR ≈ 31 dB, ISO 6400 → SNR ≈ 25 dB.
+        ISO doubles per stop: ISO 1600 → SNR ≈ 28 dB, ISO 6400 → SNR ≈ 22 dB.
         """
         return cls(gain=(iso / base_iso) * base_gain,
                    read_noise_std=base_read_noise, **kwargs)

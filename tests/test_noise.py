@@ -85,6 +85,23 @@ class TestSensorNoiseOperator:
         assert var_bright > var_dark, \
             f"Shot noise variance: bright={var_bright:.4f}, dark={var_dark:.4f}"
 
+    def test_repeated_calls_use_independent_realizations(self):
+        """
+        A seeded operator should be reproducible as a sequence, not replay the
+        exact same noise field for every same-shaped image in a dataset sweep.
+        """
+        img = torch.full((1, 64, 64), 0.5)
+        op = SensorNoiseOperator(gain=0.02, read_noise_std=0.01, clip=False, seed=7)
+
+        noise_a = op(img) - img
+        noise_b = op(img) - img
+
+        assert not torch.allclose(noise_a, noise_b)
+
+        op2 = SensorNoiseOperator(gain=0.02, read_noise_std=0.01, clip=False, seed=7)
+        torch.testing.assert_close(op2(img) - img, noise_a)
+        torch.testing.assert_close(op2(img) - img, noise_b)
+
     def test_from_iso_constructor(self, flat_image):
         # gain = (iso/base_iso) * base_gain = 32.0 * 5e-5 = 1.6e-3
         op = SensorNoiseOperator.from_iso(iso=3200, base_iso=100)

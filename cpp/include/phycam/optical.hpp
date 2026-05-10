@@ -9,6 +9,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <vector>
 #include <stdexcept>
@@ -185,6 +186,7 @@ public:
     double light_level;
     int    order;
     unsigned int rng_seed;
+    mutable std::uint64_t call_index = 0;
 
     explicit LowLightOperator(double light_level = 0.5,
                                int order = 2,
@@ -228,7 +230,9 @@ public:
             s = s * 1664525u + 1013904223u;
             return s / 4294967296.0;  // [0, 1)
         };
-        unsigned int seed = rng_seed;
+        unsigned int seed = static_cast<unsigned int>(
+            (static_cast<std::uint64_t>(rng_seed) + call_index++ * 1000003ull) & 0xffffffffull
+        );
 
         std::vector<float> tmp(H * W);
         for (int c = 0; c < buf.channels; ++c) {

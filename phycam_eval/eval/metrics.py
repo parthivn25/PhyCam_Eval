@@ -71,26 +71,45 @@ def compute_map(
             "Install with: pip install pycocotools"
         )
 
+    target_image_ids = [int(t["image_id"]) for t in targets]
+    pred_image_ids = [int(p["image_id"]) for p in predictions]
+    if len(target_image_ids) != len(set(target_image_ids)):
+        raise ValueError("targets must contain unique image_id values")
+    if len(pred_image_ids) != len(set(pred_image_ids)):
+        raise ValueError("predictions must contain unique image_id values")
+
     # Build COCO-format GT annotations
     gt_annotations = []
     gt_images = []
-    ann_id = 0
+    # COCOeval stores matched annotation IDs in arrays where 0 is the sentinel
+    # for "unmatched", so real annotation IDs must be positive.
+    ann_id = 1
 
     for target in targets:
         image_id = int(target["image_id"])
         gt_images.append({"id": image_id})
         boxes = target["boxes"]
         labels = target["labels"]
+        areas = target.get("area", None)
+        iscrowd = target.get("iscrowd", None)
 
-        for box, label in zip(boxes, labels):
+        for idx, (box, label) in enumerate(zip(boxes, labels)):
             x1, y1, x2, y2 = box.tolist() if hasattr(box, "tolist") else box
+            if areas is not None and len(areas) > idx:
+                area_val = areas[idx].item() if hasattr(areas[idx], "item") else areas[idx]
+            else:
+                area_val = (x2 - x1) * (y2 - y1)
+            if iscrowd is not None and len(iscrowd) > idx:
+                crowd_val = iscrowd[idx].item() if hasattr(iscrowd[idx], "item") else iscrowd[idx]
+            else:
+                crowd_val = 0
             gt_annotations.append({
                 "id": ann_id,
                 "image_id": image_id,
                 "category_id": int(label),
                 "bbox": [x1, y1, x2 - x1, y2 - y1],  # xywh
-                "area": float((x2 - x1) * (y2 - y1)),
-                "iscrowd": 0,
+                "area": float(area_val),
+                "iscrowd": int(crowd_val),
             })
             ann_id += 1
 
@@ -129,6 +148,8 @@ def compute_map(
     coco_dt = coco_gt.loadRes(dt_list)
 
     evaluator = COCOeval(coco_gt, coco_dt, iouType="bbox")
+    if iou_thresholds is not None:
+        evaluator.params.iouThrs = np.array(iou_thresholds, dtype=np.float64)
     evaluator.evaluate()
     evaluator.accumulate()
     evaluator.summarize()
@@ -142,8 +163,9 @@ def compute_map(
         # precision shape: (T, R, K, A, M)
         # T=10 iou thresholds, R=101 recall pts, K=cats, A=4 area, M=3 maxdets
         precision = evaluator.eval["precision"]
-        # iou=0.50 is index 0 in the default IoU threshold list [0.5, 0.55, ..., 0.95]
-        prec = precision[0, :, cat_idx, 0, 2]  # (101,)
+        # Use the actual 0.50 threshold index when a custom IoU grid is supplied.
+        iou_idx = int(np.argmin(np.abs(evaluator.params.iouThrs - 0.50)))
+        prec = precision[iou_idx, :, cat_idx, 0, 2]  # (101,)
         prec = prec[prec > -1]
         ap = float(prec.mean()) if len(prec) > 0 else 0.0
         per_class_ap[cat_id] = ap
@@ -174,14 +196,18 @@ def compute_map_ci(
 
     main = compute_map(predictions, targets)
 
-    if len(predictions) < 2:
+    image_ids = [t["image_id"] for t in targets]
+    pred_by_id = {p["image_id"]: p for p in predictions}
+    tgt_by_id  = {t["image_id"]: t for t in targets}
+    if set(pred_by_id) != set(tgt_by_id):
+        raise ValueError(
+            "compute_map_ci requires one prediction record for every target image_id"
+        )
+    if len(image_ids) < 2:
         return {**main, "map50_ci": 0.0}
 
     rng = np.random.default_rng(seed)
-    image_ids = [p["image_id"] for p in predictions]
     N = len(image_ids)
-    pred_by_id = {p["image_id"]: p for p in predictions}
-    tgt_by_id  = {t["image_id"]: t for t in targets}
 
     from tqdm import tqdm
     bootstrap_maps: list[float] = []

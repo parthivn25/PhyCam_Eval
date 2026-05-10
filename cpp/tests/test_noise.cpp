@@ -108,3 +108,25 @@ TEST_CASE("SensorNoiseOperator: shot and read noise variances add in quadrature"
     double expected_var = 0.04 * 0.5 + 0.05 * 0.05;
     REQUIRE(var == Approx(expected_var).margin(0.003));
 }
+
+TEST_CASE("SensorNoiseOperator: repeated calls use independent realizations", "[noise]") {
+    auto img = make_flat(1, 64, 64, 0.5f);
+    SensorNoiseOperator op(0.02, 0.01, false, 7);
+
+    auto out_a = op.apply_copy(img);
+    auto out_b = op.apply_copy(img);
+
+    double max_delta = 0.0;
+    for (std::size_t i = 0; i < out_a.size(); ++i) {
+        max_delta = std::max(max_delta, std::abs((double)(out_a.data[i] - out_b.data[i])));
+    }
+    REQUIRE(max_delta > 1e-5);
+
+    SensorNoiseOperator op2(0.02, 0.01, false, 7);
+    auto out2_a = op2.apply_copy(img);
+    auto out2_b = op2.apply_copy(img);
+    for (std::size_t i = 0; i < out_a.size(); ++i) {
+        REQUIRE(out2_a.data[i] == Approx(out_a.data[i]));
+        REQUIRE(out2_b.data[i] == Approx(out_b.data[i]));
+    }
+}

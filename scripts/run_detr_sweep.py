@@ -1,10 +1,9 @@
 """
 scripts/run_detr_sweep.py — DETR-ResNet-50 cross-architecture sensitivity sweep.
 
-Runs facebook/detr-resnet-50 (HuggingFace) over the same COCO subset used by
-the primary YOLOv8n sweeps, with identical protocol: conf=0.25, 200 bootstrap
-resamples, same 500 sorted image IDs.  Sweeps defocus, HDR compression, and
-sensor noise.
+Runs facebook/detr-resnet-50 (HuggingFace) over the same sorted COCO subset
+used by the primary YOLOv8n sweeps. Sweeps defocus, HDR compression, and
+sensor noise with matched confidence threshold and bootstrap protocol.
 
 Requires:
     pip install transformers
@@ -88,6 +87,7 @@ def main():
     p.add_argument("--output-dir",  default="outputs/detr_sweep")
     p.add_argument("--bootstrap-iters", type=int, default=200)
     p.add_argument("--bootstrap-seed", type=int, default=42)
+    p.add_argument("--noise-seed", type=int, default=42)
     args = p.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -119,6 +119,7 @@ def main():
         "max_images": args.max_images,
         "bootstrap_iters": args.bootstrap_iters,
         "bootstrap_seed": args.bootstrap_seed,
+        "noise_seed": args.noise_seed,
         "score_thresh": args.conf,
         "baseline_map50": baseline_map50,
     }
@@ -164,7 +165,7 @@ def main():
             base_iso=BASE_ISO,
             base_gain=BASE_GAIN,
             base_read_noise=BASE_READ_NOISE,
-            seed=42,
+            seed=args.noise_seed,
         )
         degraded = [op(img) for img in images]
         map50, ci, s, elapsed = _sweep_point(

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 from PIL import Image
 
-from phycam_eval.eval.coco import load_coco_images, run_yolo
+from phycam_eval.eval.coco import build_coco_targets, load_coco_images, run_yolo
 
 
 def _make_tiny_coco(root):
@@ -87,3 +87,27 @@ def test_run_yolo_forwards_conf_and_iou():
     assert preds[0]["boxes"].shape == (0, 4)
     assert preds[0]["labels"].shape == (0,)
     assert preds[0]["scores"].shape == (0,)
+
+
+def test_build_coco_targets_preserves_scaled_area_and_iscrowd(tmp_path):
+    root = tmp_path / "coco"
+    _make_tiny_coco(root)
+
+    ann_file = root / "annotations" / "instances_val2017.json"
+    coco_data = json.loads(ann_file.read_text())
+    coco_data["annotations"] = [
+        {
+            "image_id": 1,
+            "category_id": 1,
+            "bbox": [1.0, 2.0, 3.0, 4.0],
+            "area": 12.0,
+            "iscrowd": 1,
+        }
+    ]
+
+    image_ids, _images, metas, _ = load_coco_images(root, max_images=1, image_size=16)
+    targets = build_coco_targets(coco_data, image_ids, metas, image_size=16)
+
+    assert targets[0]["boxes"].tolist() == [[2.0, 4.0, 8.0, 12.0]]
+    assert targets[0]["area"].tolist() == [48.0]
+    assert targets[0]["iscrowd"].tolist() == [1]

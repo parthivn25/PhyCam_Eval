@@ -73,6 +73,8 @@ def build_coco_targets(
             ]
             for ann in anns
         ]
+        areas = [ann.get("area", ann["bbox"][2] * ann["bbox"][3]) * scale_x * scale_y for ann in anns]
+        iscrowd = [ann.get("iscrowd", 0) for ann in anns]
         targets.append(
             {
                 "image_id": image_id,
@@ -82,6 +84,8 @@ def build_coco_targets(
                     else np.zeros((0, 4), dtype=np.float32)
                 ),
                 "labels": np.array([ann["category_id"] for ann in anns], dtype=int),
+                "area": np.array(areas, dtype=np.float32),
+                "iscrowd": np.array(iscrowd, dtype=np.int64),
             }
         )
     return targets
