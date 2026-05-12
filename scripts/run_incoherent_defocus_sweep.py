@@ -118,10 +118,13 @@ def main():
 
     print("\n=== Baseline (clean) ===")
     clean_preds = run_fn(images)
-    baseline_map50 = compute_map(
+    baseline_res = compute_map(
         [{**p, "image_id": iid} for p, iid in zip(clean_preds, image_ids)], targets
-    )["map50"]
-    print(f"  mAP@50 = {baseline_map50:.4f}")
+    )
+    baseline_map50 = baseline_res["map50"]
+    baseline_map50_95 = baseline_res["map50_95"]
+    baseline_map75 = baseline_res["map75"]
+    print(f"  mAP@50 = {baseline_map50:.4f}  mAP@50:95 = {baseline_map50_95:.4f}  mAP@75 = {baseline_map75:.4f}")
 
     sweep = []
     for alpha in alphas:
@@ -135,12 +138,19 @@ def main():
         res = compute_map_ci(tagged, targets, n_bootstrap=args.bootstrap_iters,
                              seed=args.bootstrap_seed)
         s = res["map50"] / max(baseline_map50, 1e-6)
-        print(f"  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  S={s:.4f}  "
+        print(f"  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  mAP@50:95={res['map50_95']:.4f}  S={s:.4f}  "
               f"<|H_inc|>={otf_mean_abs:.4f}")
         sweep.append({
             "alpha":       alpha,
             "map50":       res["map50"],
+            "map50_95":    res["map50_95"],
+            "map75":       res["map75"],
             "map50_ci":    res["map50_ci"],
+            "map50_95_ci": res.get("map50_95_ci", 0.0),
+            "map50_95_small":  res["map50_95_small"],
+            "map50_95_medium": res["map50_95_medium"],
+            "map50_95_large":  res["map50_95_large"],
+            "per_class_ap":    {str(k): v for k, v in res["per_class_ap"].items()},
             "sensitivity": s,
             "otf_mean_abs": otf_mean_abs,
         })
@@ -156,6 +166,8 @@ def main():
         "n_bootstrap":     args.bootstrap_iters,
         "bootstrap_seed":  args.bootstrap_seed,
         "baseline_map50":  baseline_map50,
+        "baseline_map50_95": baseline_map50_95,
+        "baseline_map75": baseline_map75,
         "sweep":           sweep,
     }
     out_path = out_dir / "results.json"

@@ -320,15 +320,22 @@ class SensitivitySweep:
                     linewidth=1.7,
                 )
                 ax_bottom_r.set_ylabel("MTF50 (cy/px)", color=PAPER_COLORS["mtf"])
+            if not show_mtf:
+                ax_bottom_r.set_yticks([])
+                ax_bottom_r.set_ylabel("")
+                ax_bottom_r.spines["right"].set_visible(False)
 
             ax_bottom.set_xlabel(self.param_name)
             if len(theta) <= 12:
                 ax_bottom.set_xticks(theta)
 
+            annot = f"Clean mAP@50 = {self.baseline_map:.4f}"
+            if show_mtf:
+                annot += f"\nClean MTF50 = {self.baseline_mtf:.4f}"
             ax_bottom.text(
                 0.01,
                 0.96,
-                f"Clean mAP@50 = {self.baseline_map:.4f}\nClean MTF50 = {self.baseline_mtf:.4f}",
+                annot,
                 transform=ax_bottom.transAxes,
                 ha="left",
                 va="top",

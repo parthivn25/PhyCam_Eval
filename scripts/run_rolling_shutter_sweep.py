@@ -85,10 +85,13 @@ def main():
     # Baseline: readout_time = 0 (no warp)
     print("\n=== Baseline (readout_time=0) ===")
     clean_preds = run_yolo(model, images, conf=args.conf, iou=args.iou, device=args.device)
-    baseline_map50 = compute_map(
+    baseline_res = compute_map(
         [{**p, "image_id": iid} for p, iid in zip(clean_preds, image_ids)], targets
-    )["map50"]
-    print(f"  mAP@50 = {baseline_map50:.4f}")
+    )
+    baseline_map50 = baseline_res["map50"]
+    baseline_map50_95 = baseline_res["map50_95"]
+    baseline_map75 = baseline_res["map75"]
+    print(f"  mAP@50 = {baseline_map50:.4f}  mAP@50:95 = {baseline_map50_95:.4f}  mAP@75 = {baseline_map75:.4f}")
 
     sweep = []
     for rt in readout_times:
@@ -111,12 +114,19 @@ def main():
         res = compute_map_ci(tagged, warped_tgts,
                              n_bootstrap=args.bootstrap_iters, seed=args.bootstrap_seed)
         s = res["map50"] / max(baseline_map50, 1e-6)
-        print(f"  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  S={s:.4f}")
+        print(f"  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  mAP@50:95={res['map50_95']:.4f}  S={s:.4f}")
         sweep.append({
             "readout_time":       rt,
             "max_displacement_px": disp_px,
             "map50":              res["map50"],
+            "map50_95":           res["map50_95"],
+            "map75":              res["map75"],
             "map50_ci":           res["map50_ci"],
+            "map50_95_ci":        res.get("map50_95_ci", 0.0),
+            "map50_95_small":     res["map50_95_small"],
+            "map50_95_medium":    res["map50_95_medium"],
+            "map50_95_large":     res["map50_95_large"],
+            "per_class_ap":       {str(k): v for k, v in res["per_class_ap"].items()},
         })
 
     thr = None
@@ -133,6 +143,8 @@ def main():
     out = {
         "velocity_x":           args.velocity_x,
         "baseline_map50":       baseline_map50,
+        "baseline_map50_95":    baseline_map50_95,
+        "baseline_map75":       baseline_map75,
         "gt_warped":            True,
         "sweep":                sweep,
         "threshold_map_10pct_displacement_px": thr,

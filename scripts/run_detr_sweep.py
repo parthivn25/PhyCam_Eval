@@ -73,7 +73,7 @@ def _sweep_point(run_fn, degraded, image_ids, targets, baseline, bootstrap_iters
     res = compute_map_ci(tagged, targets, n_bootstrap=bootstrap_iters, seed=bootstrap_seed)
     s = res["map50"] / max(baseline, 1e-6)
     elapsed = time.time() - t0
-    return res["map50"], res["map50_ci"], s, elapsed
+    return res, s, elapsed
 
 
 def main():
@@ -107,9 +107,12 @@ def main():
 
     print("\n=== Baseline (clean) ===")
     t0 = time.time()
-    baseline_map50 = compute_map(run_fn(images), targets)["map50"]
+    baseline_res = compute_map(run_fn(images), targets)
+    baseline_map50 = baseline_res["map50"]
+    baseline_map50_95 = baseline_res["map50_95"]
+    baseline_map75 = baseline_res["map75"]
     baseline_elapsed = time.time() - t0
-    print(f"  mAP@50 = {baseline_map50:.4f}  [{baseline_elapsed/60:.1f} min]")
+    print(f"  mAP@50 = {baseline_map50:.4f}  mAP@75 = {baseline_map75:.4f}  [{baseline_elapsed/60:.1f} min]")
     n_passes = 1 + len(ALPHAS) + len(BETAS) + 1 + len(ISO_VALUES)
     print(f"  → est. total: {baseline_elapsed * n_passes / 60:.0f} min  "
           f"({n_passes} passes × {baseline_elapsed/60:.1f} min each)")
@@ -122,6 +125,8 @@ def main():
         "noise_seed": args.noise_seed,
         "score_thresh": args.conf,
         "baseline_map50": baseline_map50,
+        "baseline_map50_95": baseline_map50_95,
+        "baseline_map75": baseline_map75,
     }
 
     # ── Defocus sweep ──────────────────────────────────────────────────────────
@@ -130,12 +135,20 @@ def main():
     for alpha in ALPHAS:
         op = DefocusOperator(alpha=alpha)
         degraded = [op(img) for img in images]
-        map50, ci, s, elapsed = _sweep_point(
+        res, s, elapsed = _sweep_point(
             run_fn, degraded, image_ids, targets, baseline_map50,
             args.bootstrap_iters, args.bootstrap_seed,
         )
-        print(f"  α={alpha:.1f}  mAP={map50:.4f} ±{ci:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
-        defocus_sweep.append({"param": alpha, "map50": map50, "map50_ci": ci, "S": s})
+        print(f"  α={alpha:.1f}  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  mAP@50:95={res['map50_95']:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
+        defocus_sweep.append({
+            "param": alpha, "map50": res["map50"], "map50_95": res["map50_95"],
+            "map75": res["map75"], "map50_ci": res["map50_ci"],
+            "map50_95_ci": res.get("map50_95_ci", 0.0),
+            "map50_95_small": res["map50_95_small"], "map50_95_medium": res["map50_95_medium"],
+            "map50_95_large": res["map50_95_large"],
+            "per_class_ap": {str(k): v for k, v in res["per_class_ap"].items()},
+            "S": s,
+        })
     results["defocus"] = {"baseline_map50": baseline_map50, "sweep": defocus_sweep}
 
     # ── HDR sweep ──────────────────────────────────────────────────────────────
@@ -144,12 +157,20 @@ def main():
     for beta in BETAS:
         op = HDRCompressionOperator(beta=beta)
         degraded = [op(img) for img in images]
-        map50, ci, s, elapsed = _sweep_point(
+        res, s, elapsed = _sweep_point(
             run_fn, degraded, image_ids, targets, baseline_map50,
             args.bootstrap_iters, args.bootstrap_seed,
         )
-        print(f"  β={beta:.1f}  mAP={map50:.4f} ±{ci:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
-        hdr_sweep.append({"param": beta, "map50": map50, "map50_ci": ci, "S": s})
+        print(f"  β={beta:.1f}  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  mAP@50:95={res['map50_95']:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
+        hdr_sweep.append({
+            "param": beta, "map50": res["map50"], "map50_95": res["map50_95"],
+            "map75": res["map75"], "map50_ci": res["map50_ci"],
+            "map50_95_ci": res.get("map50_95_ci", 0.0),
+            "map50_95_small": res["map50_95_small"], "map50_95_medium": res["map50_95_medium"],
+            "map50_95_large": res["map50_95_large"],
+            "per_class_ap": {str(k): v for k, v in res["per_class_ap"].items()},
+            "S": s,
+        })
     results["hdr"] = {"baseline_map50": baseline_map50, "sweep": hdr_sweep}
 
     # ── Noise sweep ────────────────────────────────────────────────────────────
@@ -157,7 +178,8 @@ def main():
     noise_sweep = []
     # Use separate baseline run for noise (matches main sweep protocol)
     t0 = time.time()
-    noise_baseline = compute_map(run_fn(images), targets)["map50"]
+    noise_baseline_res = compute_map(run_fn(images), targets)
+    noise_baseline = noise_baseline_res["map50"]
     print(f"  noise baseline mAP@50 = {noise_baseline:.4f}  [{(time.time()-t0)/60:.1f} min]")
     for iso in ISO_VALUES:
         op = SensorNoiseOperator.from_iso(
@@ -168,12 +190,20 @@ def main():
             seed=args.noise_seed,
         )
         degraded = [op(img) for img in images]
-        map50, ci, s, elapsed = _sweep_point(
+        res, s, elapsed = _sweep_point(
             run_fn, degraded, image_ids, targets, noise_baseline,
             args.bootstrap_iters, args.bootstrap_seed,
         )
-        print(f"  ISO={iso}  mAP={map50:.4f} ±{ci:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
-        noise_sweep.append({"param": iso, "map50": map50, "map50_ci": ci, "S": s})
+        print(f"  ISO={iso}  mAP={res['map50']:.4f} ±{res['map50_ci']:.4f}  mAP@50:95={res['map50_95']:.4f}  S={s:.4f}  [{elapsed/60:.1f} min]")
+        noise_sweep.append({
+            "param": iso, "map50": res["map50"], "map50_95": res["map50_95"],
+            "map75": res["map75"], "map50_ci": res["map50_ci"],
+            "map50_95_ci": res.get("map50_95_ci", 0.0),
+            "map50_95_small": res["map50_95_small"], "map50_95_medium": res["map50_95_medium"],
+            "map50_95_large": res["map50_95_large"],
+            "per_class_ap": {str(k): v for k, v in res["per_class_ap"].items()},
+            "S": s,
+        })
     results["noise"] = {"baseline_map50": noise_baseline, "sweep": noise_sweep}
 
     out_path = out_dir / "results.json"

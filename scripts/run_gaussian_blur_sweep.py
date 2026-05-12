@@ -113,8 +113,10 @@ def main():
         seed=args.bootstrap_seed,
     )
     baseline_map50 = map_res["map50"]
+    baseline_map50_95 = map_res["map50_95"]
+    baseline_map75 = map_res["map75"]
     baseline_map50_ci = map_res["map50_ci"]
-    print(f"  mAP@50 = {baseline_map50:.4f} ±{baseline_map50_ci:.4f}")
+    print(f"  mAP@50 = {baseline_map50:.4f} ±{baseline_map50_ci:.4f}  mAP@50:95 = {baseline_map50_95:.4f}  mAP@75 = {baseline_map75:.4f}")
 
     try:
         freqs, mtf_vals = measure_mtf(mtf_chart, roi=mtf_roi)
@@ -146,9 +148,10 @@ def main():
             seed=args.bootstrap_seed,
         )
         map50_val = res["map50"]
+        map50_95_val = res["map50_95"]
         map50_ci  = res["map50_ci"]
         s_val = map50_val / max(baseline_map50, 1e-6)
-        print(f"  mAP@50 = {map50_val:.4f} ±{map50_ci:.4f}  (S = {s_val:.3f})")
+        print(f"  mAP@50 = {map50_val:.4f} ±{map50_ci:.4f}  mAP@50:95 = {map50_95_val:.4f}  (S = {s_val:.3f})")
 
         mtf50_val = 0.0
         try:
@@ -163,8 +166,13 @@ def main():
         sweep.add(sigma, map50=map50_val, mtf50=mtf50_val, map50_ci=map50_ci)
         all_data.append({
             "sigma": sigma,
-            "map50": map50_val,
-            "map50_ci": map50_ci,
+            "map50": map50_val, "map50_95": map50_95_val,
+            "map75": res.get("map75", 0.0),
+            "map50_ci": map50_ci, "map50_95_ci": res.get("map50_95_ci", 0.0),
+            "map50_95_small": res.get("map50_95_small", 0.0),
+            "map50_95_medium": res.get("map50_95_medium", 0.0),
+            "map50_95_large": res.get("map50_95_large", 0.0),
+            "per_class_ap": {str(k): v for k, v in res.get("per_class_ap", {}).items()},
             "mtf50": mtf50_val,
             "S": s_val,
         })
@@ -183,6 +191,8 @@ def main():
             "max_images": args.max_images,
             "bootstrap_iters": args.bootstrap_iters,
             "baseline_map50": baseline_map50,
+            "baseline_map50_95": baseline_map50_95,
+            "baseline_map75": baseline_map75,
             "baseline_map50_ci": baseline_map50_ci,
             "baseline_mtf50": baseline_mtf50,
             "sweep": all_data,

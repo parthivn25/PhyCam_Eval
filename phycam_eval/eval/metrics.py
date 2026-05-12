@@ -154,8 +154,14 @@ def compute_map(
     evaluator.accumulate()
     evaluator.summarize()
 
+    # stats layout: [mAP@50:95, mAP@50, mAP@75, mAP@50:95_small, _medium, _large,
+    #                 AR@1, AR@10, AR@100, AR@100_small, AR@100_medium, AR@100_large]
     map50_95 = float(evaluator.stats[0])
     map50 = float(evaluator.stats[1])
+    map75 = float(evaluator.stats[2])
+    map50_95_small = float(evaluator.stats[3])
+    map50_95_medium = float(evaluator.stats[4])
+    map50_95_large = float(evaluator.stats[5])
 
     # Per-class AP @ IoU=0.50 (precision at iouThr=0.50, areaRng='all', maxDets=100)
     per_class_ap: dict[int, float] = {}
@@ -173,6 +179,10 @@ def compute_map(
     return {
         "map50": map50,
         "map50_95": map50_95,
+        "map75": map75,
+        "map50_95_small": map50_95_small,
+        "map50_95_medium": map50_95_medium,
+        "map50_95_large": map50_95_large,
         "per_class_ap": per_class_ap,
     }
 
@@ -210,7 +220,8 @@ def compute_map_ci(
     N = len(image_ids)
 
     from tqdm import tqdm
-    bootstrap_maps: list[float] = []
+    bootstrap_map50: list[float] = []
+    bootstrap_map50_95: list[float] = []
     bootstrap_errors: list[str] = []
     for _ in tqdm(range(n_bootstrap), desc="  bootstrap", unit="resample",
                   dynamic_ncols=True, leave=False):
@@ -229,7 +240,8 @@ def compute_map_ci(
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 r = compute_map(sub_preds, sub_targets)
-            bootstrap_maps.append(r["map50"])
+            bootstrap_map50.append(r["map50"])
+            bootstrap_map50_95.append(r["map50_95"])
         except Exception as exc:
             bootstrap_errors.append(repr(exc))
 
@@ -238,15 +250,19 @@ def compute_map_ci(
             f"{len(bootstrap_errors)} of {n_bootstrap} bootstrap mAP resamples failed; "
             f"first failure: {bootstrap_errors[0]}"
         )
-        if not bootstrap_maps:
+        if not bootstrap_map50:
             raise RuntimeError(msg)
         warnings.warn(msg, RuntimeWarning, stacklevel=2)
 
-    ci_half = (
-        1.96 * float(np.std(bootstrap_maps, ddof=1))
-        if len(bootstrap_maps) >= 2 else 0.0
-    )
-    return {**main, "map50_ci": ci_half, "bootstrap_failures": len(bootstrap_errors)}
+    def _ci(samples: list[float]) -> float:
+        return 1.96 * float(np.std(samples, ddof=1)) if len(samples) >= 2 else 0.0
+
+    return {
+        **main,
+        "map50_ci": _ci(bootstrap_map50),
+        "map50_95_ci": _ci(bootstrap_map50_95),
+        "bootstrap_failures": len(bootstrap_errors),
+    }
 
 
 def sensitivity_ratio(

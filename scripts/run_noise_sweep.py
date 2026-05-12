@@ -114,13 +114,16 @@ def main():
     # Baseline uses clean images so sensitivity is measured relative to undegraded data.
     print(f"\n=== Baseline (ISO={args.base_iso}, clean) ===")
     baseline_map50 = 0.0
+    baseline_map50_95 = 0.0
     if run_fn is not None:
         clean_preds = run_fn(images)
         map_res = compute_map(
             [{**p, "image_id": iid} for p, iid in zip(clean_preds, image_ids)],
             targets)
         baseline_map50 = map_res["map50"]
-        print(f"  mAP@50 = {baseline_map50:.4f}")
+        baseline_map50_95 = map_res["map50_95"]
+        baseline_map75 = map_res["map75"]
+        print(f"  mAP@50 = {baseline_map50:.4f}  mAP@50:95 = {baseline_map50_95:.4f}  mAP@75 = {baseline_map75:.4f}")
 
     baseline_mtf50 = 0.0
     try:
@@ -157,6 +160,7 @@ def main():
               f"({t_degrade/len(images)*1000:.2f} ms/img)")
 
         map50_val = 0.0
+        map50_95_val = 0.0
         map50_ci = 0.0
         if run_fn is not None:
             preds = run_fn(degraded)
@@ -167,8 +171,10 @@ def main():
                 seed=args.bootstrap_seed,
             )
             map50_val = map_res["map50"]
+            map50_95_val = map_res["map50_95"]
             map50_ci = map_res["map50_ci"]
             print(f"  mAP@50 = {map50_val:.4f} ±{map50_ci:.4f}  "
+                  f"mAP@50:95 = {map50_95_val:.4f}  "
                   f"(S = {map50_val/max(baseline_map50,1e-6):.3f})")
 
         # MTF50 on synthetic chart — noise increases ESF variance, measurably
@@ -188,8 +194,13 @@ def main():
             "iso": iso,
             "gain": op.gain,
             "snr_db": snr,
-            "map50": map50_val,
-            "map50_ci": map50_ci,
+            "map50": map50_val, "map50_95": map50_95_val,
+            "map75": map_res.get("map75", 0.0),
+            "map50_ci": map50_ci, "map50_95_ci": map_res.get("map50_95_ci", 0.0),
+            "map50_95_small": map_res.get("map50_95_small", 0.0),
+            "map50_95_medium": map_res.get("map50_95_medium", 0.0),
+            "map50_95_large": map_res.get("map50_95_large", 0.0),
+            "per_class_ap": {str(k): v for k, v in map_res.get("per_class_ap", {}).items()},
             "mtf50": mtf50_val,
         })
 
@@ -212,6 +223,8 @@ def main():
             "base_read_noise": args.base_read_noise,
             "base_gain": args.base_gain,
             "baseline_map50": baseline_map50,
+            "baseline_map50_95": baseline_map50_95,
+            "baseline_map75": baseline_map75,
             "baseline_mtf50": baseline_mtf50,
             "sweep": all_data,
             "threshold_map_10pct_iso": thr_map,

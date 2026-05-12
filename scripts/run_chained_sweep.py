@@ -81,7 +81,7 @@ def run_grid(
     bootstrap_seed: int = 42,
     noise_seed: int = 42,
 ):
-    """Run every (β, ISO) combination. Returns baseline_map50, grid of (map50, map50_ci)."""
+    """Run every (β, ISO) combination. Returns baseline_map50, baseline_map50_95, grid."""
     # Baseline (β=1, ISO=100 clean)
     print("\n=== Baseline (clean) ===")
     clean_preds = run_fn(images)
@@ -92,9 +92,11 @@ def run_grid(
         seed=bootstrap_seed,
     )
     baseline_map50 = map_res["map50"]
-    print(f"  mAP@50 = {baseline_map50:.4f} ±{map_res['map50_ci']:.4f}")
+    baseline_map50_95 = map_res["map50_95"]
+    baseline_map75 = map_res["map75"]
+    print(f"  mAP@50 = {baseline_map50:.4f} ±{map_res['map50_ci']:.4f}  mAP@50:95 = {baseline_map50_95:.4f}  mAP@75 = {baseline_map75:.4f}")
 
-    grid = {}          # (beta, iso) -> {"map50": float, "map50_ci": float}
+    grid = {}          # (beta, iso) -> {"map50": float, "map50_95": float, "map50_ci": float}
     for beta in betas:
         hdr_op = HDRCompressionOperator(beta=beta)
         t0 = time.perf_counter()
@@ -118,10 +120,19 @@ def run_grid(
                 seed=bootstrap_seed,
             )
             m, ci = map_res["map50"], map_res["map50_ci"]
-            grid[(beta, iso)] = {"map50": m, "map50_ci": ci}
-            print(f"  ISO={iso:5d}  mAP@50={m:.4f} ±{ci:.4f}  S={m/max(baseline_map50,1e-6):.3f}")
+            m95 = map_res["map50_95"]
+            grid[(beta, iso)] = {
+                "map50": m, "map50_95": m95, "map50_ci": ci,
+                "map75": map_res["map75"],
+                "map50_95_ci": map_res.get("map50_95_ci", 0.0),
+                "map50_95_small": map_res["map50_95_small"],
+                "map50_95_medium": map_res["map50_95_medium"],
+                "map50_95_large": map_res["map50_95_large"],
+                "per_class_ap": {str(k): v for k, v in map_res["per_class_ap"].items()},
+            }
+            print(f"  ISO={iso:5d}  mAP@50={m:.4f} ±{ci:.4f}  mAP@50:95={m95:.4f}  S={m/max(baseline_map50,1e-6):.3f}")
 
-    return baseline_map50, grid
+    return baseline_map50, baseline_map50_95, baseline_map75, grid
 
 
 def plot_heatmap(betas, iso_values, grid, baseline_map50, save_path):
@@ -304,7 +315,7 @@ def main():
     print(f"Loading detector: {args.detector}")
     _, run_fn, det_tag = _load_detector(args)
 
-    baseline_map50, grid = run_grid(
+    baseline_map50, baseline_map50_95, baseline_map75, grid = run_grid(
         images, image_ids, targets, run_fn, betas, iso_values,
         bootstrap_iters=args.bootstrap_iters,
         bootstrap_seed=args.bootstrap_seed,
@@ -320,13 +331,22 @@ def main():
         "bootstrap_seed": args.bootstrap_seed,
         "noise_seed": args.noise_seed,
         "baseline_map50": baseline_map50,
+        "baseline_map50_95": baseline_map50_95,
+        "baseline_map75": baseline_map75,
         "betas": betas,
         "iso_values": iso_values,
         "grid": [
             {
                 "beta": b, "iso": iso,
                 "map50": grid[(b, iso)]["map50"],
+                "map50_95": grid[(b, iso)]["map50_95"],
+                "map75": grid[(b, iso)]["map75"],
                 "map50_ci": grid[(b, iso)]["map50_ci"],
+                "map50_95_ci": grid[(b, iso)].get("map50_95_ci", 0.0),
+                "map50_95_small": grid[(b, iso)]["map50_95_small"],
+                "map50_95_medium": grid[(b, iso)]["map50_95_medium"],
+                "map50_95_large": grid[(b, iso)]["map50_95_large"],
+                "per_class_ap": grid[(b, iso)]["per_class_ap"],
                 "sensitivity": grid[(b, iso)]["map50"] / max(baseline_map50, 1e-6),
             }
             for b in betas for iso in iso_values
