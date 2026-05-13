@@ -26,6 +26,7 @@ Outputs:
 """
 
 import argparse
+import gc
 import json
 import time
 from pathlib import Path
@@ -141,6 +142,7 @@ def main():
         print(f"  Blur: {(time.perf_counter()-t0)*1000:.0f} ms")
 
         preds = run_fn(degraded)
+        del degraded; gc.collect()
         tagged = [{**pr, "image_id": iid} for pr, iid in zip(preds, image_ids)]
         res = compute_map_ci(
             tagged, targets,

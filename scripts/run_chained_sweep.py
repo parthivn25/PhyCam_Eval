@@ -23,6 +23,7 @@ Outputs:
 """
 
 import argparse
+import gc
 import json
 import time
 from pathlib import Path
@@ -99,9 +100,7 @@ def run_grid(
     grid = {}          # (beta, iso) -> {"map50": float, "map50_95": float, "map50_ci": float}
     for beta in betas:
         hdr_op = HDRCompressionOperator(beta=beta)
-        t0 = time.perf_counter()
-        hdr_degraded = [hdr_op(img) for img in images]
-        print(f"\n--- β = {beta:.2f}  ({time.perf_counter()-t0:.1f}s) ---")
+        print(f"\n--- β = {beta:.2f} ---")
 
         for iso in iso_values:
             noise_op = SensorNoiseOperator.from_iso(
@@ -111,8 +110,9 @@ def run_grid(
                 base_gain=BASE_GAIN,
                 seed=noise_seed,
             )
-            chained = [noise_op(img) for img in hdr_degraded]
+            chained = [noise_op(hdr_op(img)) for img in images]
             preds = run_fn(chained)
+            del chained; gc.collect()
             tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
             map_res = compute_map_ci(
                 tagged, targets,

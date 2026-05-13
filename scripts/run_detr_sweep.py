@@ -20,6 +20,7 @@ Outputs:
 """
 
 import argparse
+import gc
 import json
 import time
 from pathlib import Path
@@ -70,6 +71,7 @@ def _run(model, processor, imgs, image_ids, conf, device):
 def _sweep_point(run_fn, degraded, image_ids, targets, baseline, bootstrap_iters, bootstrap_seed):
     t0 = time.time()
     tagged = run_fn(degraded)
+    del degraded; gc.collect()
     res = compute_map_ci(tagged, targets, n_bootstrap=bootstrap_iters, seed=bootstrap_seed)
     s = res["map50"] / max(baseline, 1e-6)
     elapsed = time.time() - t0

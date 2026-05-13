@@ -7,6 +7,7 @@ utilities needed for the sensitivity landscape S(θ).
 
 from __future__ import annotations
 
+import gc
 from typing import Any
 import warnings
 
@@ -244,6 +245,9 @@ def compute_map_ci(
             bootstrap_map50_95.append(r["map50_95"])
         except Exception as exc:
             bootstrap_errors.append(repr(exc))
+        finally:
+            del sub_preds, sub_targets
+            gc.collect()
 
     if bootstrap_errors:
         msg = (

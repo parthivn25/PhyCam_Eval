@@ -23,6 +23,7 @@ Outputs:
 """
 
 import argparse
+import gc
 import json
 import time
 from pathlib import Path
@@ -164,6 +165,7 @@ def main():
         map50_ci = 0.0
         if run_fn is not None:
             preds = run_fn(degraded)
+            del degraded; gc.collect()
             tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
             map_res = compute_map_ci(
                 tagged, targets,

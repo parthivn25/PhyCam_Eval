@@ -22,6 +22,7 @@ Outputs:
 """
 
 import argparse
+import gc
 import json
 from pathlib import Path
 
@@ -110,6 +111,8 @@ def main():
             )
 
         preds = run_yolo(model, warped_imgs, conf=args.conf, iou=args.iou, device=args.device)
+        if warped_imgs is not images:
+            del warped_imgs; gc.collect()
         tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
         res = compute_map_ci(tagged, warped_tgts,
                              n_bootstrap=args.bootstrap_iters, seed=args.bootstrap_seed)

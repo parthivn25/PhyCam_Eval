@@ -29,6 +29,7 @@ Note:
 """
 
 import argparse
+import gc
 import json
 from pathlib import Path
 
@@ -134,6 +135,7 @@ def main():
         otf_mean_abs = pairs[0][1]  # same for all images at given alpha
 
         preds = run_fn(degraded_all)
+        del degraded_all, pairs; gc.collect()
         tagged = [{**p, "image_id": iid} for p, iid in zip(preds, image_ids)]
         res = compute_map_ci(tagged, targets, n_bootstrap=args.bootstrap_iters,
                              seed=args.bootstrap_seed)
