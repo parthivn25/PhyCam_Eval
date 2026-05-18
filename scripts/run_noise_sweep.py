@@ -238,6 +238,8 @@ def main():
         save_path=str(out_dir / f"figure_noise_sensitivity{suffix}.png"),
         title=f"Sensitivity Landscape: Sensor Noise — {det_tag}",
         close=True,
+        show_mtf=False,  # MTF on a slanted-edge chart is not the headline metric for noise
+        log_x=True,      # ISO values are geometric — log scale prevents tick crowding
     )
     print(f"Figure saved to {out_dir}/figure_noise_sensitivity{suffix}.png")
 

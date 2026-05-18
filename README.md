@@ -8,21 +8,21 @@
 
 Existing robustness benchmarks (ImageNet-C and its derivatives) apply heuristic corruptions — Gaussian blur, uniform noise, JPEG compression — with abstract severity levels that are difficult to relate to camera or ISP parameters.
 
-PhyCam-Eval expresses each simplified degradation in camera-native units: wavefront phase strength α (quadratic pupil-phase defocus), spectral amplitude exponent β (linear-light HDR compression via the ODRC formalism), and ISO-calibrated mixed Poisson-Gaussian sensor noise. The operators are intended for reproducible sensitivity screening, not as a complete camera simulation.
+PhyCam-Eval expresses each simplified degradation as a controlled diagnostic in camera-interpretable units: phase strength α (a quadratic Fourier-phase diagnostic, not a full incoherent-defocus model), spectral-amplitude exponent β (a global spectral-amplitude compression proxy used as a detection-side stand-in for global tone-curve transforms), and ISO-calibrated mixed Poisson-Gaussian sensor noise. The operators are intended for reproducible sensitivity screening, not as a calibrated camera simulation.
 
 ---
 
-## Image Formation Model
+## Benchmark Degradation Model
 
 ```
 I_d = N_σ( Q_β( A_φ( I_ideal ) ) )
 ```
 
-| Operator | Symbol | Physical parameter | Module |
+| Operator | Symbol | Parameter | Module |
 |---|---|---|---|
-| Optical (quadratic pupil phase) | A_φ | Defocus α | `degradations/optical.py` |
-| HDR compression (linear-light ODRC) | Q_β | Compression ratio β | `degradations/hdr.py` |
-| Sensor noise | N_σ | Gain g (ISO), read noise σ_r | `degradations/noise.py` |
+| Quadratic Fourier-phase diagnostic | A_φ | Phase strength α | `degradations/optical.py` |
+| Spectral-amplitude compression (HDR proxy) | Q_β | Exponent β | `degradations/hdr.py` |
+| Sensor noise (Poisson-Gaussian) | N_σ | Gain g (ISO), read noise σ_r | `degradations/noise.py` |
 
 ---
 

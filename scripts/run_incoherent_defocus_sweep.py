@@ -3,7 +3,7 @@ scripts/run_incoherent_defocus_sweep.py — Incoherent-OTF defocus sweep.
 
 Tests a physically realistic incoherent defocus model: the OTF is the
 Fourier transform of the squared-magnitude of the coherent PSF, which
-attenuates amplitude (unlike the phase-only A_phi operator).
+attenuates amplitude, unlike the unprojected complex phase factor used by A_phi.
 
 Physical model:
     h_coh(x)   = F^{-1}{ exp(j alpha rho^2) }     coherent impulse response

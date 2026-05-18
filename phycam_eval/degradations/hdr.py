@@ -1,5 +1,7 @@
 """
-HDR dynamic range compression operator — C++ backend with numpy fallback.
+Spectral-amplitude compression operator (HDR/tone-curve proxy) — C++
+backend with numpy fallback.  Not a validated ISP tone-mapping model;
+see the manuscript for proxy caveats.
 """
 from __future__ import annotations
 import numpy as np
@@ -49,7 +51,7 @@ def _linear_to_srgb(x: np.ndarray) -> np.ndarray:
 
 class HDRCompressionOperator:
     r"""
-    ODRC-inspired HDR dynamic range compression (C++ / numpy).
+    ODRC-inspired spectral-amplitude compression proxy (C++ / numpy).
 
         L = sRGB⁻¹(I)
         Q_β(I) = sRGB(clip(F⁻¹ { sign(F(L)) · |F(L)|^β }, 0, 1))

@@ -143,6 +143,7 @@ class SensitivitySweep:
         title: str | None = None,
         close: bool = False,
         show_mtf: bool = True,
+        log_x: bool = False,
     ) -> plt.Figure:
         """
         Render a two-panel sensitivity figure:
@@ -256,10 +257,10 @@ class SensitivitySweep:
             ax_top.tick_params(labelbottom=False)
 
             def _fmt(v: float) -> str:
-                """Format threshold: integer if close to one, else 4 sig figs."""
+                """Format interpolated thresholds coarsely."""
                 if v == v and abs(v - round(v)) < 0.5 and abs(v) >= 10:
                     return str(int(round(v)))
-                return f"{v:.4g}"
+                return f"{v:.2f}"
 
             thresholds = []
             if thr_map is not None:
@@ -326,8 +327,16 @@ class SensitivitySweep:
                 ax_bottom_r.spines["right"].set_visible(False)
 
             ax_bottom.set_xlabel(self.param_name)
-            if len(theta) <= 12:
-                ax_bottom.set_xticks(theta)
+            if log_x:
+                ax_top.set_xscale("log")
+                ax_bottom.set_xscale("log")
+                if len(theta) <= 12:
+                    ax_bottom.set_xticks(theta)
+                    ax_bottom.set_xticklabels([str(int(t)) if float(t).is_integer() else f"{t:g}" for t in theta])
+                ax_bottom.minorticks_off()
+            else:
+                if len(theta) <= 12:
+                    ax_bottom.set_xticks(theta)
 
             annot = f"Clean mAP@50 = {self.baseline_map:.4f}"
             if show_mtf:

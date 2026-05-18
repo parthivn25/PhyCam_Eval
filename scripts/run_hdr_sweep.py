@@ -217,6 +217,7 @@ def main():
         save_path=str(out_dir / f"figure_hdr_sensitivity{suffix}.png"),
         title=f"Sensitivity Landscape: HDR Compression — {det_tag}",
         close=True,
+        show_mtf=False,  # Q_beta is a global spectral operator, not a blur kernel
     )
     print(f"Figure saved to {out_dir}/figure_hdr_sensitivity{suffix}.png")
 

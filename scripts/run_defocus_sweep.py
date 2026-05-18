@@ -117,7 +117,7 @@ def main():
         print(f"  MTF50  = {baseline_mtf50:.4f} cy/px (synthetic chart)")
     except Exception as e:
         print(f"  MTF50 measurement failed: {e}")
-    print("  NOTE: phase-only OTF |H(f)|=1 — MTF50 will remain flat across alpha.")
+    print("  NOTE: unprojected complex factor has |H(f)|=1; real projection is diagnostic.")
 
     # Sweep
     sweep = SensitivitySweep(
@@ -159,7 +159,7 @@ def main():
                   f"mAP@50:95 = {map50_95_val:.4f}  "
                   f"(S = {map50_val/max(baseline_map50,1e-6):.3f})")
 
-        # MTF50 on synthetic chart (expected flat — phase-only operator)
+        # MTF50 on synthetic chart for the quadratic phase diagnostic.
         mtf50_val = 0.0
         try:
             deg_chart = op(mtf_chart)

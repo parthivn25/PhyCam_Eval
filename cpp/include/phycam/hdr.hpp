@@ -1,11 +1,14 @@
 /**
- * phycam/hdr.hpp — HDR dynamic range compression operator.
+ * phycam/hdr.hpp — Spectral-amplitude compression operator (HDR/tone-curve proxy).
  *
- * From the ODRC formalism (Nair et al., 2026), ported to camera images:
+ * Not a validated ISP tone-mapping model; intended as a detection-side
+ * proxy for global contrast-reducing tone curves.  See the manuscript
+ * for proxy caveats.
+ *
  *   L = sRGB^{-1}(I)
  *   Q_β(I) = sRGB(clip(F⁻¹ { sign(F(L)) · |F(L)|^β }, 0, 1))
  *
- * β=1 → identity.  β<1 → compression.  β>1 → expansion.
+ * β=1 → identity.  β<1 → net contrast compression on natural images.
  */
 #pragma once
 

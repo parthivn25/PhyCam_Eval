@@ -4,9 +4,9 @@ scripts/run_gaussian_blur_sweep.py — ImageNet-C style Gaussian blur sensitivit
 Runs YOLOv8n (and optionally Faster R-CNN) over COCO images degraded with
 Gaussian blur across a range of σ values, using an identical protocol to the
 PhyCam-Eval operator sweeps.  Provides a direct numerical comparison against
-the phase-only defocus sweep (run_defocus_sweep.py):
+the quadratic Fourier-phase diagnostic sweep (run_defocus_sweep.py):
 
-    - Phase-only defocus (A_φ):  |H(f)| ≡ 1  →  ΔS ≤ 0.014
+    - Quadratic phase diagnostic (A_φ): small measured ΔS over α≤3
     - Gaussian blur (ImageNet-C): |H(f)| → 0  →  drops 10% threshold at σ ≈ ?
 
 The Gaussian OTF is H(f) = exp(-2π²σ²|f|²), which attenuates amplitude.

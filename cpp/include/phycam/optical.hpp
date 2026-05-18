@@ -23,14 +23,18 @@ namespace phycam {
 // ---------------------------------------------------------------------------
 
 /**
- * Defocus via quadratic pupil phase.
+ * Quadratic Fourier-phase diagnostic.  Applies the coherent quadratic
+ * phase factor exp(j α ρ²) to the image-intensity spectrum and projects
+ * back to the real domain.  This is a controlled phase-rotation
+ * diagnostic, not a model of incoherent lens defocus (which also
+ * attenuates amplitude).  See the manuscript for full caveats.
  *
- * Physical derivation:
+ * Reference:
  *   Wavefront error for defocus:  W(u,v) = W₂₀ · r²/R²
  *   Pupil function:  P(u,v) = circ(r/R) · exp(j 2π W₂₀ r²/R²)
  *   PST equivalent:  φ(ρ) = α · ρ²
  *
- * @param alpha  Phase strength (≥0). 0 = identity. ~π = visible blur.
+ * @param alpha  Phase strength (≥0). 0 = identity.
  * @param normalize_freq  If true, ρ normalised to [0,1] before applying φ.
  */
 class DefocusOperator {
@@ -67,7 +71,7 @@ public:
         return phi;
     }
 
-    /** Apply defocus to a (C,H,W) image buffer in-place.  Returns ref to buf. */
+    /** Apply the quadratic phase diagnostic to a (C,H,W) image buffer in-place. */
     ImageBuffer& apply(ImageBuffer& buf) const {
         int H = buf.height, W = buf.width;
         auto phi = phase_mask(H, W);
@@ -91,10 +95,11 @@ public:
     }
 
     /**
-     * OTF magnitude (MTF) for this defocus strength.
-     * Returns a flat (H*W) vector of |exp(j phi)| = 1 everywhere
-     * (phase-only filter).  For a physically complete OTF including
-     * the pupil aperture, see otf_with_aperture().
+     * OTF magnitude of the unprojected complex factor at this phase strength.
+     * Returns a flat (H*W) vector of |exp(j phi)| = 1 everywhere.  Note
+     * that the operator's real-projection step (Re{·}) gives an effective
+     * |H_eff| < 1; for a physically complete OTF including the pupil
+     * aperture, see otf_with_aperture().
      */
     std::vector<Real> otf_magnitude(int H, int W) const {
         // Phase-only: |H(ω)| = 1 ∀ ω

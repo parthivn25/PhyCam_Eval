@@ -96,13 +96,15 @@ def _apply_amp_np(image: np.ndarray, amp: np.ndarray) -> np.ndarray:
 
 class DefocusOperator:
     r"""
-    Defocus blur via quadratic pupil phase (Fourier optics / PST formalism).
+    Quadratic Fourier-phase diagnostic (PST-style phase rotation on the
+    image-intensity spectrum followed by a Re{·} projection).  Not a model
+    of incoherent lens defocus; see the manuscript for full caveats.
 
         A_φ(I)[c] = Re{ F⁻¹{ F(I[c]) · exp(j α ρ²) } }
 
     Parameters
     ----------
-    alpha : float ≥ 0   Phase strength.  0 = identity.  ~π = strong blur.
+    alpha : float ≥ 0   Phase strength.  0 = identity.
     normalize_freq : bool  Normalise ρ to [0,1] (default True, PhyCV convention).
     """
 
