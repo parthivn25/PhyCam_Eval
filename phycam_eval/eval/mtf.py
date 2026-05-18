@@ -1,7 +1,7 @@
 """
 Modulation Transfer Function (MTF) measurement via the slanted-edge method.
 
-Standard reference: ISO 12233:2023 (Photography — Electronic still picture imaging
+Standard reference: ISO 12233:2017 (Photography — Electronic still picture imaging
 — Resolution and spatial frequency responses).
 
 Overview
